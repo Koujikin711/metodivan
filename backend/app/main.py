@@ -657,39 +657,44 @@ async def _run_startup_db_and_seed() -> None:
     except Exception as exc:
         # Не валим весь API (Amvera 503): /health и /health/db должны отвечать.
         logger.exception("startup migrations failed (API still starts): %s", exc)
+    # Важно: на Amvera без DATABASE_URL — SQLite /app/data/crm.db.
+    # settings.database_url может быть пустым → миграции должны брать effective_database_url().
+    db_url = effective_database_url()
     try:
         # enum-миграции PostgreSQL нельзя выполнять внутри begin-транзакции.
         # Для надёжности запускаем каждую миграцию на отдельном "свежем" connection.
-        async with engine.connect() as conn:
-            await ensure_task_status_missed(conn, settings.database_url)
-        async with engine.connect() as conn:
-            await ensure_owner_role_migration(conn, settings.database_url)
-        async with engine.connect() as conn:
-            await ensure_integration_provider_migration(conn, settings.database_url)
-        async with engine.connect() as conn:
-            await ensure_clinic_staff_roles(conn, settings.database_url)
-        async with engine.connect() as conn:
-            await ensure_user_last_seen_at(conn, settings.database_url)
-        async with engine.connect() as conn:
-            await ensure_user_presence_days(conn, settings.database_url)
-            await ensure_debtor_collection_notes(conn, settings.database_url)
-            await ensure_debtor_dismissals(conn, settings.database_url)
-            await ensure_protocol_followups(conn, settings.database_url)
-            await ensure_user_pay_profile(conn, settings.database_url)
-            await ensure_user_also_curator(conn, settings.database_url)
-            await ensure_user_also_expert(conn, settings.database_url)
-            await ensure_task_repeats_daily(conn, settings.database_url)
-            await ensure_task_repeat_weekdays(conn, settings.database_url)
-            await ensure_task_repeat_dates(conn, settings.database_url)
-            await ensure_task_repeat_until(conn, settings.database_url)
-            await ensure_booking_referrer(conn, settings.database_url)
-            await ensure_lead_clinical_diagnosis(conn, settings.database_url)
-            await ensure_lead_patient_birth_date(conn, settings.database_url)
-            await ensure_payroll_adjustments(conn, settings.database_url)
-            await ensure_employee_name_terms(conn, settings.database_url)
-            await ensure_payroll_sheet_hides(conn, settings.database_url)
-            await ensure_payroll_sheet_order(conn, settings.database_url)
-            await conn.commit()
+        migration_steps = (
+            ensure_task_status_missed,
+            ensure_owner_role_migration,
+            ensure_integration_provider_migration,
+            ensure_clinic_staff_roles,
+            ensure_user_last_seen_at,
+            ensure_user_presence_days,
+            ensure_debtor_collection_notes,
+            ensure_debtor_dismissals,
+            ensure_protocol_followups,
+            ensure_user_pay_profile,
+            ensure_user_also_curator,
+            ensure_user_also_expert,
+            ensure_task_repeats_daily,
+            ensure_task_repeat_weekdays,
+            ensure_task_repeat_dates,
+            ensure_task_repeat_until,
+            ensure_booking_referrer,
+            ensure_lead_clinical_diagnosis,
+            ensure_lead_patient_birth_date,
+            ensure_payroll_adjustments,
+            ensure_employee_name_terms,
+            ensure_payroll_sheet_hides,
+            ensure_payroll_sheet_order,
+        )
+        for step in migration_steps:
+            try:
+                async with engine.connect() as conn:
+                    await step(conn, db_url)
+                    await conn.commit()
+            except Exception:
+                logger.exception("startup migration %s failed; continuing", step.__name__)
         await seed_pipelines_and_stages()
         await seed_test_admin()
         await seed_super_owner()
@@ -697,26 +702,27 @@ async def _run_startup_db_and_seed() -> None:
         await seed_lead_sources_defaults()
         await seed_sales_crm_space()
         await ensure_canonical_pipeline_stages()
-        try:
-            from app.services.ensure_crm_dn_owner import ensure_crm_dn_dilnoza_owner
-
-            await ensure_crm_dn_dilnoza_owner()
-        except Exception:
-            logger.exception("ensure_crm_dn_dilnoza_owner failed; continuing startup")
-        try:
-            from app.services.purge_demo_artifacts import purge_demo_artifacts_from_client_companies
-
-            await purge_demo_artifacts_from_client_companies()
-        except Exception:
-            logger.exception("purge_demo_artifacts failed; continuing startup")
-        try:
-            from app.services.ensure_crm_dn_sales_plan import ensure_crm_dn_sales_plan_items
-
-            await ensure_crm_dn_sales_plan_items()
-        except Exception:
-            logger.exception("ensure_crm_dn_sales_plan_items failed; continuing startup")
     except Exception as exc:
         logger.exception("startup seed/enum failed (API still starts): %s", exc)
+
+    try:
+        from app.services.ensure_crm_dn_owner import ensure_crm_dn_dilnoza_owner
+
+        await ensure_crm_dn_dilnoza_owner()
+    except Exception:
+        logger.exception("ensure_crm_dn_dilnoza_owner failed; continuing startup")
+    try:
+        from app.services.purge_demo_artifacts import purge_demo_artifacts_from_client_companies
+
+        await purge_demo_artifacts_from_client_companies()
+    except Exception:
+        logger.exception("purge_demo_artifacts failed; continuing startup")
+    try:
+        from app.services.ensure_crm_dn_sales_plan import ensure_crm_dn_sales_plan_items
+
+        await ensure_crm_dn_sales_plan_items()
+    except Exception:
+        logger.exception("ensure_crm_dn_sales_plan_items failed; continuing startup")
 
 
 @asynccontextmanager
