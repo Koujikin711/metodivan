@@ -698,6 +698,12 @@ async def _run_startup_db_and_seed() -> None:
         await seed_sales_crm_space()
         await ensure_canonical_pipeline_stages()
         try:
+            from app.services.ensure_crm_dn_owner import ensure_crm_dn_dilnoza_owner
+
+            await ensure_crm_dn_dilnoza_owner()
+        except Exception:
+            logger.exception("ensure_crm_dn_dilnoza_owner failed; continuing startup")
+        try:
             from app.services.purge_demo_artifacts import purge_demo_artifacts_from_client_companies
 
             await purge_demo_artifacts_from_client_companies()
