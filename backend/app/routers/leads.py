@@ -503,6 +503,8 @@ async def create_lead(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Stage is outside manager directions")
     manager_id = await _manager_id_for_manual_lead_create(db, stage=stage, current_user=current_user, company_id=company_id)
     phone_norm = whatsapp_e164_digits(norm_phone(body.phone) or body.phone) or None
+    # Один номер — несколько ФИО: новую карточку разрешаем.
+    # Блокируем только точный дубль (тот же телефон + то же имя в этой воронке).
     if phone_norm and len(phone_norm) >= 9:
         existing = await find_lead_by_any_phone(
             db,
@@ -511,13 +513,16 @@ async def create_lead(
             pipeline_id=int(stage.pipeline_id),
         )
         if existing is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"Лид с таким телефоном уже есть: {existing.name or 'без имени'} "
-                    f"(#{existing.id}). Откройте существующую карточку."
-                ),
-            )
+            new_name = (body.name or "").strip().casefold()
+            old_name = (existing.name or "").strip().casefold()
+            if new_name and old_name and new_name == old_name:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"Лид с таким телефоном и ФИО уже есть: {existing.name or 'без имени'} "
+                        f"(#{existing.id}). Откройте существующую карточку."
+                    ),
+                )
     lead = Lead(
         company_id=company_id,
         name=body.name,

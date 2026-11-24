@@ -709,6 +709,12 @@ async def _run_startup_db_and_seed() -> None:
             await purge_demo_artifacts_from_client_companies()
         except Exception:
             logger.exception("purge_demo_artifacts failed; continuing startup")
+        try:
+            from app.services.ensure_crm_dn_sales_plan import ensure_crm_dn_sales_plan_items
+
+            await ensure_crm_dn_sales_plan_items()
+        except Exception:
+            logger.exception("ensure_crm_dn_sales_plan_items failed; continuing startup")
     except Exception as exc:
         logger.exception("startup seed/enum failed (API still starts): %s", exc)
 

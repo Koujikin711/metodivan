@@ -1824,9 +1824,11 @@ async def load_managers(
     pipeline_id: int,
 ) -> list[tuple[int, str]]:
     """Активные менеджеры воронки — блоки KPI создаются автоматически."""
+    # Менеджер воронки + РОП / владелец с назначением — иначе KPI «Продажи» пустой,
+    # когда продают не только role=manager.
     rows = (
         await db.execute(
-            select(User.id, User.full_name, User.email)
+            select(User.id, User.full_name, User.email, User.role)
             .join(
                 UserPipelineAssignment,
                 (UserPipelineAssignment.user_id == User.id)
@@ -1836,13 +1838,20 @@ async def load_managers(
             .where(
                 User.company_id == company_id,
                 User.is_active.is_(True),
-                User.role == UserRole.manager,
+                User.role.in_(
+                    (
+                        UserRole.manager,
+                        UserRole.rop,
+                        UserRole.owner,
+                        UserRole.admin,
+                    )
+                ),
             )
             .order_by(User.full_name.asc().nulls_last(), User.email.asc()),
         )
     ).all()
     out: list[tuple[int, str]] = []
-    for uid, full_name, email in rows:
+    for uid, full_name, email, _role in rows:
         out.append((int(uid), str(full_name or email or f"#{uid}")))
     return out
 
