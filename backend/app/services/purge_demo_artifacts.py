@@ -1,9 +1,4 @@
-"""Убрать студийный sandbox из рабочих компаний.
-
-Studio Demo и лиды с @example.com — артефакты Public Sandbox /demo-login.
-В клиентских компаниях пользователя деактивируем, демо-лиды удаляем.
-Живые лиды (без @example.com) не трогаем.
-"""
+"""Удалить только демо-лиды (@example.com). Studio Demo оставляем владельцем CRM-DN."""
 
 from __future__ import annotations
 
@@ -21,18 +16,15 @@ from app.models import (
     Lead,
     LeadAuditEvent,
     Task,
-    User,
 )
 
 logger = logging.getLogger(__name__)
 
 SANDBOX_COMPANY_NAME = "Public Sandbox (MetodiOne Studio)"
-SANDBOX_EMAIL = "demo@sandbox.local"
 
 
 async def purge_demo_artifacts_from_client_companies() -> dict[str, int]:
-    """Скрыть Studio Demo и удалить демо-лиды (@example.com) вне sandbox."""
-    deactivated_users = 0
+    """Удалить лиды с @example.com вне старого sandbox. Studio Demo не трогаем."""
     deleted_leads = 0
 
     async with AsyncSessionLocal() as session:
@@ -45,19 +37,6 @@ async def purge_demo_artifacts_from_client_companies() -> dict[str, int]:
             ).scalars().all()
         }
 
-        demo_users = list(
-            (
-                await session.execute(select(User).where(User.email == SANDBOX_EMAIL))
-            ).scalars().all()
-        )
-        for u in demo_users:
-            cid = int(u.company_id) if u.company_id is not None else None
-            if cid is not None and cid in sandbox_ids:
-                continue
-            if u.is_active:
-                u.is_active = False
-                deactivated_users += 1
-
         demo_rows = list(
             (
                 await session.execute(
@@ -65,7 +44,6 @@ async def purge_demo_artifacts_from_client_companies() -> dict[str, int]:
                 )
             ).all()
         )
-        # company_id → lead ids
         by_company: dict[int, list[int]] = {}
         for lid, cid in demo_rows:
             if cid is None:
@@ -130,10 +108,7 @@ async def purge_demo_artifacts_from_client_companies() -> dict[str, int]:
 
         await session.commit()
 
-    stats = {
-        "deactivated_users": deactivated_users,
-        "deleted_leads": deleted_leads,
-    }
-    if any(stats.values()):
+    stats = {"deleted_leads": deleted_leads}
+    if deleted_leads:
         logger.info("purge_demo_artifacts: %s", stats)
     return stats
