@@ -123,7 +123,17 @@ function pushClinicalCareNav(items: ShellSidebarNavItem[]) {
   items.push(medicalCardNavItem());
 }
 
-export function buildShellSidebarNavItems(params: BuildParams): ShellSidebarNavItem[] {
+/** CRM-DN: скрытые разделы клиники MetodiOne (сайдбар). */
+export const CRM_DN_HIDDEN_NAV_IDS = new Set([
+  "extra-services",
+  "curator-journal",
+  "medical-card",
+  "finance",
+  "tasks",
+  "messenger",
+]);
+
+function buildShellSidebarNavItemsRaw(params: BuildParams): ShellSidebarNavItem[] {
   const {
     isSuperOwner,
     isManagerNav,
@@ -854,6 +864,10 @@ export function buildShellSidebarNavItems(params: BuildParams): ShellSidebarNavI
     });
   }
   return items;
+}
+
+export function buildShellSidebarNavItems(params: BuildParams): ShellSidebarNavItem[] {
+  return buildShellSidebarNavItemsRaw(params).filter((item) => !CRM_DN_HIDDEN_NAV_IDS.has(item.id));
 }
 
 /** Пункты, которые уходят в меню «Настройки» / «Скрыть». */

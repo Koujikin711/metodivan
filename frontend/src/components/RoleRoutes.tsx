@@ -57,7 +57,7 @@ export function HomeEntry() {
     return <Navigate to="/rop" replace />;
   }
   if (role === "finance_analyst") {
-    return <Navigate to="/finance" replace />;
+    return <Navigate to="/expenses" replace />;
   }
   if (role === "accountant") {
     return <Navigate to="/expenses" replace />;

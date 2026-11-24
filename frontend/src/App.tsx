@@ -6,7 +6,6 @@ import {
   BookingOrSalesEntry,
   HomeEntry,
   RequireExpenses,
-  RequireFinance,
   RequireMarketing,
   RequireNotManager,
   RequireOwner,
@@ -26,20 +25,15 @@ import { LoginPage } from "@/pages/LoginPage";
 import { MyLeadsPage } from "@/pages/MyLeadsPage";
 import { CompaniesPage } from "@/pages/CompaniesPage";
 import { CrmPage } from "@/pages/CrmPage";
-import { FinancePage } from "@/pages/FinancePage";
 import { IntegrationsHubPage } from "@/pages/IntegrationsHubPage";
 import { KpiPage } from "@/pages/KpiPage";
 import { DemoEnterPage } from "@/pages/DemoEnterPage";
 import { OnboardingPage } from "@/pages/OnboardingPage";
-import { TasksPage } from "@/pages/TasksPage";
-import { TeamMessengerPage } from "@/pages/TeamMessengerPage";
 import { ManagerDeskPage } from "@/pages/ManagerDeskPage";
 import { ManagerSalesPage } from "@/pages/ManagerSalesPage";
 import { MarketingPage } from "@/pages/MarketingPage";
 import { SalesQuoteCalculatorPage } from "@/pages/SalesQuoteCalculatorPage";
 import { SalesVisitTrackerPage } from "@/pages/SalesVisitTrackerPage";
-import { ExtraServicesPage } from "@/pages/ExtraServicesPage";
-import { CuratorJournalPage } from "@/pages/CuratorJournalPage";
 import { DevCuratorListPreview } from "@/pages/DevCuratorListPreview";
 import { DevBookingAdminPreview } from "@/pages/DevBookingAdminPreview";
 import { DevBookingRenamePreview } from "@/pages/DevBookingRenamePreview";
@@ -48,7 +42,6 @@ import { DevKpiDuplicateNamePreview } from "@/pages/DevKpiDuplicateNamePreview";
 import { DevKpiEarningsClickPreview } from "@/pages/DevKpiEarningsClickPreview";
 import { DevKpiEarningsLogicPreview } from "@/pages/DevKpiEarningsLogicPreview";
 import DevEmrChartPreview from "@/pages/DevEmrChartPreview";
-import MedicalCardPage from "@/pages/MedicalCardPage";
 import { SalesControlPage } from "@/pages/SalesControlPage";
 import { RopLayout } from "@/pages/rop/RopLayout";
 import { RopDashboardPage } from "@/pages/rop/RopDashboardPage";
@@ -92,17 +85,17 @@ export default function App() {
             <Route path="/crm" element={<CrmPage />} />
             <Route path="/my-leads" element={<MyLeadsPage />} />
             <Route path="/booking" element={<BookingOrSalesEntry />} />
-            <Route path="/extra-services" element={<ExtraServicesPage />} />
-            <Route path="/curator-journal" element={<CuratorJournalPage />} />
-            <Route path="/medical-card" element={<MedicalCardPage />} />
-            <Route path="/medical-card/:leadId" element={<MedicalCardPage />} />
+            <Route path="/extra-services" element={<Navigate to="/app" replace />} />
+            <Route path="/curator-journal" element={<Navigate to="/app" replace />} />
+            <Route path="/medical-card" element={<Navigate to="/app" replace />} />
+            <Route path="/medical-card/:leadId" element={<Navigate to="/app" replace />} />
             <Route path="/sales-control" element={<SalesControlPage />} />
             <Route path="/sales" element={<ManagerSalesPage />} />
             <Route path="/quote" element={<SalesQuoteCalculatorPage />} />
             <Route path="/tracker" element={<SalesVisitTrackerPage />} />
             <Route path="/leads/:id" element={<LeadDetailPage />} />
-            <Route path="/tasks" element={<TasksPage />} />
-            <Route path="/messenger" element={<TeamMessengerPage />} />
+            <Route path="/tasks" element={<Navigate to="/app" replace />} />
+            <Route path="/messenger" element={<Navigate to="/chat" replace />} />
             <Route
               path="/analytics"
               element={
@@ -128,14 +121,7 @@ export default function App() {
               <Route path="outlook" element={<RopOutlookPage />} />
               <Route path="search" element={<RopSearchPage />} />
             </Route>
-            <Route
-              path="/finance"
-              element={
-                <RequireFinance>
-                  <FinancePage />
-                </RequireFinance>
-              }
-            />
+            <Route path="/finance" element={<Navigate to="/expenses" replace />} />
             <Route
               path="/expenses"
               element={

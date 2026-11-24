@@ -4,13 +4,16 @@ from __future__ import annotations
 
 # kind → пользовательское имя. Catalog KPI «Курс» ↔ kind main_course.
 PRODUCT_KIND_LABELS: dict[str, str] = {
-    "course_15": "Курс 15",
-    "main_course": "Курс",
-    "protocol": "Протокол",
-    "other_service": "Другая услуга",
+    "course_15": "Пакет 15",
+    "main_course": "Пакет",
+    "protocol": "Услуга (архив)",
+    "other_service": "Разовая услуга",
     "visit": "Визит",
     "desk": "Desk",
     "extra": "Доп. услуга",
+    "consult": "Консультация",
+    "subscription": "Подписка",
+    "support": "Сопровождение",
 }
 
 

@@ -277,36 +277,19 @@ export function AnalyticsPage() {
     (servicesQuery.data?.service_stats ?? []).length === 0 &&
     Number(servicesQuery.data?.revenue_total ?? 0) === 0;
 
-  const snapshotQuery = useQuery({
-    queryKey: ["analytics-services-snapshot"],
-    queryFn: async () => {
-      const res = await fetch("/reports/services-analytics-snapshot.json");
-      if (!res.ok) throw new Error("Снимок отчёта не найден");
-      return (await res.json()) as {
-        pipeline_name: string;
-        year_month?: string;
-        period_start?: string;
-        period_end?: string;
-        revenue_total: number | string;
-        debtor_total: number | string;
-        service_stats: ServicesAnalyticsServiceStat[];
-        expert_stats: ServicesAnalyticsExpertStat[];
-      };
-    },
-    enabled: servicesMode && servicesLiveEmpty,
-    staleTime: Infinity,
-  });
-
-  const serviceRows =
-    !servicesLiveEmpty && servicesQuery.data
-      ? (servicesQuery.data.service_stats ?? [])
-      : (snapshotQuery.data?.service_stats ?? []);
+  // CRM-DN: без демо-снимка клиники — только живые данные / пустое использование.
+  const serviceRowsRaw = servicesQuery.data?.service_stats ?? [];
+  const serviceRows = useMemo(
+    () =>
+      serviceRowsRaw.filter((row) => {
+        const n = (row.direction_name || "").toLowerCase();
+        return !n.includes("протокол") && !n.includes("архив");
+      }),
+    [serviceRowsRaw],
+  );
   const serviceGroups = useMemo(() => partitionAnalyticsServices(serviceRows), [serviceRows]);
   const chartServices = serviceRows.filter((row) => row.direction_name !== "Долг прошлых месяцев");
-  const chartExperts =
-    !servicesLiveEmpty && servicesQuery.data
-      ? (servicesQuery.data.expert_stats ?? [])
-      : (snapshotQuery.data?.expert_stats ?? []);
+  const chartExperts = servicesQuery.data?.expert_stats ?? [];
 
   const htmlReportHref = useMemo(() => {
     const p = new URLSearchParams();
@@ -321,10 +304,9 @@ export function AnalyticsPage() {
       if (dateTo) p.set("date_to", dateTo);
     }
     if (servicesPipelineId != null) p.set("pipeline_id", String(servicesPipelineId));
-    if (servicesLiveEmpty) p.set("snapshot", "1");
     const q = p.toString();
     return `/reports/services-analytics.html${q ? `?${q}` : ""}`;
-  }, [period, yearMonth, dateFrom, dateTo, servicesPipelineId, servicesLiveEmpty]);
+  }, [period, yearMonth, dateFrom, dateTo, servicesPipelineId]);
 
   return (
     <div className="analytics-page mo-fill-page">
@@ -348,7 +330,7 @@ export function AnalyticsPage() {
             aria-selected={servicesMode}
             onClick={() => setDimension("services")}
           >
-            Услуги
+            Использование
           </button>
           <button
             type="button"
@@ -357,7 +339,7 @@ export function AnalyticsPage() {
             aria-selected={patientsMode}
             onClick={() => setDimension("patients")}
           >
-            Пациенты & LTV
+            Клиенты & LTV
           </button>
         </div>
       </header>
@@ -586,42 +568,27 @@ export function AnalyticsPage() {
           {servicesQuery.data ? (
             <>
               {(() => {
-                const live = !servicesLiveEmpty;
-                const total = Number(
-                  live ? servicesQuery.data.revenue_total : (snapshotQuery.data?.revenue_total ?? 0),
-                );
+                const total = Number(servicesQuery.data.revenue_total ?? 0);
                 const visits = Number(
-                  live
-                    ? (servicesQuery.data.booking_paid_total ??
-                        Math.max(
-                          0,
-                          total -
-                            Number(servicesQuery.data.kpi_course_paid_total ?? 0) -
-                            Number(servicesQuery.data.extra_paid_total ?? 0),
-                        ))
-                    : 0,
+                  servicesQuery.data.booking_paid_total ??
+                    Math.max(
+                      0,
+                      total -
+                        Number(servicesQuery.data.kpi_course_paid_total ?? 0) -
+                        Number(servicesQuery.data.extra_paid_total ?? 0),
+                    ),
                 );
-                const courses = Number(live ? (servicesQuery.data.kpi_course_paid_total ?? 0) : 0);
-                const extraKeep = Number(
-                  live
-                    ? (servicesQuery.data.extra_keep_total ?? servicesQuery.data.extra_paid_total ?? 0)
-                    : 0,
-                );
+                const packages = Number(servicesQuery.data.kpi_course_paid_total ?? 0);
+                const serviceCount = serviceRows.length;
                 return (
                   <div className="analytics-kpi-grid analytics-kpi-grid--5">
                     <MetricCard label="Выручка всего" value={moneyFmt.format(total)} tone="success" />
-                    <MetricCard label="Услуги · визиты" value={moneyFmt.format(visits)} tone="accent" />
-                    <MetricCard label="Курсы / протоколы" value={moneyFmt.format(courses)} tone="neutral" />
-                    <MetricCard label="Доп. услуги" value={moneyFmt.format(extraKeep)} tone="warning" />
+                    <MetricCard label="Оплаты визитов" value={moneyFmt.format(visits)} tone="accent" />
+                    <MetricCard label="Пакеты / услуги" value={moneyFmt.format(packages)} tone="neutral" />
+                    <MetricCard label="Услуг в отчёте" value={String(serviceCount)} tone="warning" />
                     <MetricCard
                       label="Дебиторка"
-                      value={moneyFmt.format(
-                        Number(
-                          live
-                            ? servicesQuery.data.debtor_total
-                            : (snapshotQuery.data?.debtor_total ?? 0),
-                        ),
-                      )}
+                      value={moneyFmt.format(Number(servicesQuery.data.debtor_total ?? 0))}
                       tone="warning"
                     />
                   </div>
@@ -630,11 +597,8 @@ export function AnalyticsPage() {
 
               {servicesLiveEmpty ? (
                 <p className="analytics-hint">
-                  В этой базе за месяц пусто — ниже графики из снимка августа 2026 (live CRM). Полный
-                  HTML-отчёт:{" "}
-                  <a href={htmlReportHref} target="_blank" rel="noreferrer">
-                    /reports/services-analytics.html
-                  </a>
+                  Пока нет данных использования за период — таблицы пустые. Новые продажи и записи появятся
+                  здесь автоматически.
                 </p>
               ) : null}
 
@@ -771,7 +735,7 @@ export function AnalyticsPage() {
                   label="Оплачено"
                   value={moneyFmt.format(Number(overviewQuery.data.executive.paid_amount))}
                   tone="success"
-                  hint="Как в услугах: визиты без пакетов «Курс» и «Протокол», плюс оплаты KPI"
+                  hint="Визиты и оплаты пакетов CRM-DN (без архивных протоколов)"
                 />
                 <MetricCard
                   label="Не оплачено"

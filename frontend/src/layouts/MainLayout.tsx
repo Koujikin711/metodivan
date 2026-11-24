@@ -83,8 +83,8 @@ export function MainLayout() {
   // Онлайн-запись только в clinic; в sales скрыта (booking_enabled=false).
   const bookingEnabled = meQuery.isSuccess && meQuery.data?.booking_enabled !== false;
   const deskSalesEnabled = salesSpace;
-  const showExtraServices =
-    role === "owner" || role === "admin" || role === "administrator" || role === "accountant";
+  // CRM-DN: доп. услуги / клиника MetodiOne скрыты из меню.
+  const showExtraServices = false;
   const managerChatFirst = chatStagesEnabled && isManagerLikeNav;
   const { showNavForFeature } = useTariffNavAccess();
   const { expanded: sidebarExpanded, toggle: toggleSidebar } = useShellSidebarExpanded();
@@ -225,7 +225,7 @@ export function MainLayout() {
               deskSalesEnabled={deskSalesEnabled}
               chatStagesEnabled={chatStagesEnabled}
               showExtraServices={showExtraServices}
-              showCuratorJournal={role === "admin"}
+              showCuratorJournal={false}
               hideEmployees={role === "manager"}
               showNavForFeature={showNavForFeature}
             />

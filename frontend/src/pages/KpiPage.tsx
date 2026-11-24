@@ -745,6 +745,11 @@ export function KpiPage() {
   const [saleFormOpen, setSaleFormOpen] = useState(false);
   const [tab, setTab] = useState<TabId>(isCurator ? "debtors" : "sales");
 
+  // CRM-DN: вкладка «Протоколы 30д» убрана.
+  useEffect(() => {
+    if (tab === "protocols") setTab("manual");
+  }, [tab]);
+
   const [rateDraft, setRateDraft] = useState<Record<string, string>>({});
   const [nameDraft, setNameDraft] = useState<Record<string, string>>({});
 
@@ -1345,16 +1350,10 @@ export function KpiPage() {
       shortLabel: "Продажи",
       show: kpiOps && !isCurator,
     },
-    { id: "manual", label: "Курсы / протоколы", shortLabel: "Курсы", show: kpiOps },
-    {
-      id: "protocols",
-      label: "Протоколы 30д",
-      shortLabel: "30д",
-      show: kpiOps,
-    },
+    { id: "manual", label: "Пакеты / услуги", shortLabel: "Пакеты", show: kpiOps },
     {
       id: "debtors",
-      label: isCurator ? "Дебиторка курсов / протоколов" : "Дебиторка",
+      label: isCurator ? "Дебиторка пакетов" : "Дебиторка",
       shortLabel: "Долги",
       show: isAdminOrOwner || isCurator || isAccountant,
     },
@@ -1379,6 +1378,8 @@ export function KpiPage() {
 
   const filteredManualSales = useMemo(() => {
     let rows = manualQuery.data ?? [];
+    // CRM-DN: протоколы скрыты из списка продаж пакетов.
+    rows = rows.filter((s) => saleProductKind(s.plan_item_name) !== "protocol");
     if (saleProductFilter !== "all") {
       rows = rows.filter((s) => saleProductKind(s.plan_item_name) === saleProductFilter);
     }
@@ -1641,7 +1642,7 @@ export function KpiPage() {
         <>
         <section className="mo-section space-y-3 p-3 sm:space-y-4 sm:p-4">
           <div>
-            <h2 className="text-base font-semibold text-[var(--mo-text)] sm:text-lg">Курсы и проданные протоколы</h2>
+            <h2 className="text-base font-semibold text-[var(--mo-text)] sm:text-lg">Пакеты и продажи услуг</h2>
             {isManager ? (
               <p className="kpi-confirm-notice" role="status">
                 Доплата после OK — на подтверждение бухгалтеру.
@@ -2089,8 +2090,7 @@ export function KpiPage() {
             {(
               [
                 ["all", "Все"],
-                ["course", "Курсы"],
-                ["protocol", "Протоколы"],
+                ["course", "Пакеты"],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -2120,7 +2120,7 @@ export function KpiPage() {
                       <select
                         className="mo-input mt-1 max-w-full text-[11px]"
                         aria-label={`Тип продажи ${s.client_name}`}
-                        title="Сменить продукт: Курс / Протокол"
+                        title="Сменить продукт / услугу"
                         value={s.plan_item_id}
                         disabled={changeSalePlanItem.isPending}
                         onChange={(e) => {
@@ -2298,7 +2298,7 @@ export function KpiPage() {
                         <select
                           className="mo-input kpi-course-flow kpi-course-flow--wide"
                           aria-label={`Тип продажи ${s.client_name}`}
-                          title="Сменить продукт: Курс / Протокол"
+                          title="Сменить продукт / услугу"
                           value={s.plan_item_id}
                           disabled={changeSalePlanItem.isPending}
                           onChange={(e) => {
@@ -3375,7 +3375,7 @@ function CompanyReportSection({
       <section className="mo-section p-4">
         <h3 className="mb-3 text-lg font-semibold text-[var(--mo-text)]">По услугам</h3>
         <p className="mb-3 text-sm lux-caption">
-          Отдельно: Курс, Курс 15, Протокол, Массаж и т.д. — итог по всей клинике за месяц.
+          По услугам CRM-DN: консультация, пакеты и разовые услуги — итог за месяц.
         </p>
         <div className="overflow-x-auto">
           <table className="kpi-data-table min-w-[1100px] text-sm">

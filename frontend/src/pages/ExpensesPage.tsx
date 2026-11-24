@@ -569,7 +569,7 @@ function ExpenseEditForm({
           <input className="mo-input mt-1" value={draft.via_person} onChange={(e) => set({ via_person: e.target.value })} />
         </label>
         <label className="text-[11px] text-[var(--mo-text-muted)]">
-          Товар / услуга
+          Товар / услуга — стандартный список CRM-DN; своё — «Другое…»
           <input className="mo-input mt-1" value={draft.product_service} onChange={(e) => set({ product_service: e.target.value })} />
         </label>
         <label className="text-[11px] text-[var(--mo-text-muted)]">
@@ -1100,6 +1100,10 @@ export function ExpensesPage() {
             {selectOrCustom(brief, [...catalog.brief_categories], setBrief, "Кратко")}
             {selectOrCustom(detail, [...catalog.detail_categories], setDetail, "Подробно")}
             {selectOrCustom(product, [...catalog.products], setProduct, "Товар / услуга")}
+            <p className="col-span-full text-[11px] text-[var(--mo-text-muted)]">
+              Стандартный список CRM-DN. Нет нужной позиции — выберите «Другое…» и введите своё значение в поле
+              ниже.
+            </p>
             <div className="expenses-payees">
             <label className="expenses-field">
               <span className="expenses-field__label">Основание</span>
