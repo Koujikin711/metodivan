@@ -607,7 +607,7 @@ export function LeadDetailPage() {
                       {stageDisplay}
                     </span>
                   ) : null}
-                  <span className="text-xs tabular-nums mo-muted" title="ID в MetodiOne">
+                  <span className="text-xs tabular-nums mo-muted" title="ID в CRM-DN">
                     #{query.data.id}
                     {leadSessionNumber != null
                       ? ` · ${leadSessionNumber.includes(":") ? leadSessionNumber : `сеанс ${leadSessionNumber}`}`

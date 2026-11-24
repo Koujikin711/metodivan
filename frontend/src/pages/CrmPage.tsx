@@ -2827,7 +2827,7 @@ export function CrmPage() {
                 onClick={() => void downloadImportTemplate()}
                 className="w-full rounded-xl border border-[var(--mo-border-strong)] py-2 text-sm text-[var(--mo-text)] transition hover:bg-[var(--mo-accent-soft)]"
               >
-                Скачать шаблон CSV для MetodiOne
+                Скачать шаблон CSV для CRM-DN
               </button>
 
               <div className="grid gap-2 sm:grid-cols-2">

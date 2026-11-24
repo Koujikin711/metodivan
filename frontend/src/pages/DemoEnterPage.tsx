@@ -55,7 +55,7 @@ export function DemoEnterPage() {
   return (
     <div className="studio-root" style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: "1.5rem" }}>
       <div className="studio-feature" style={{ maxWidth: 420, textAlign: "center" }}>
-        <h1 style={{ marginTop: 0 }}>MetodiOne CRM</h1>
+        <h1 style={{ marginTop: 0 }}>CRM-DN</h1>
         <p className="studio-muted">Открываем демо…</p>
       </div>
     </div>

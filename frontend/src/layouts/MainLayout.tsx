@@ -196,10 +196,10 @@ export function MainLayout() {
                 if (!phoneLayout) toggleSidebar();
               }}
               className="shell-sidebar-brand"
-              aria-label={phoneLayout ? "MetodiOne" : menuExpanded ? "Свернуть меню" : "Развернуть меню"}
+              aria-label={phoneLayout ? "CRM-DN" : menuExpanded ? "Свернуть меню" : "Развернуть меню"}
             >
               <MetodiBrandMark />
-              <span className="shell-sidebar-brand-text">MetodiOne</span>
+              <span className="shell-sidebar-brand-text">CRM-DN</span>
             </button>
           </div>
           <nav className="shell-sidebar-nav no-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto py-0">

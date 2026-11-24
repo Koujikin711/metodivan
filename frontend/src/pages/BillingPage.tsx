@@ -99,7 +99,7 @@ export function BillingTariffPage() {
         <div className="mo-section border-[#c9b07a]/50 bg-[#faf5eb] text-sm">
           <p className="font-semibold text-[#1e3348]">Демо-период завершён</p>
           <p className="mt-2 text-[var(--mo-text-muted)]">
-            Выберите тариф ниже, чтобы продолжить работу в MetodiOne. После выбора с вами свяжется администратор
+            Выберите тариф ниже, чтобы продолжить работу в CRM-DN. После выбора с вами свяжется администратор
             платформы для подтверждения оплаты и включения доступа.
           </p>
         </div>

@@ -58,7 +58,7 @@ export function CrmToolbar({
 
       <div className="crm-toolbar__head">
         <div className="crm-toolbar__brand">
-          <h1 className="crm-brand-title">MetodiOne</h1>
+          <h1 className="crm-brand-title">CRM-DN</h1>
           <p className="crm-toolbar__subtitle">CRM · управление воронкой и лидами</p>
         </div>
         <div className="crm-toolbar__actions">

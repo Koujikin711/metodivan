@@ -143,7 +143,7 @@ export function LoginPage() {
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#e8f0f7] text-[#2f5f85] shadow-sm">
             <LayoutDashboard className="h-8 w-8" />
           </div>
-          <h1 className="mt-6 text-3xl font-semibold tracking-tight text-[var(--mo-text)]">MetodiOne</h1>
+          <h1 className="mt-6 text-3xl font-semibold tracking-tight text-[var(--mo-text)]">CRM-DN</h1>
           <p className="mt-2 max-w-xs text-sm text-[var(--mo-text-muted)]">
             {mode === "login" ? "Войдите в рабочую панель" : "Создайте аккаунт для доступа"}
           </p>

@@ -1,7 +1,7 @@
 {
-  "name": "MetodiOne",
-  "short_name": "MetodiOne",
-  "description": "CRM MetodiOne",
+  "name": "CRM-DN",
+  "short_name": "CRM-DN",
+  "description": "CRM-DN",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
