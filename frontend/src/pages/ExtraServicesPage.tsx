@@ -144,7 +144,7 @@ function canEditExtraServiceSettings(role: string | null): boolean {
 
 const fieldClass = "mo-input mt-1.5 w-full min-w-0";
 
-const PAYMENT_PRESETS = ["Касса", "ДС", "Алиф", "Эсхата"] as const;
+const PAYMENT_PRESETS = ["Касса", "дс", "Алиф", "эсхата"] as const;
 
 /** Подпункты УЗИ: фиксированные цены (сомони). */
 export const UZI_SUBTYPES = [

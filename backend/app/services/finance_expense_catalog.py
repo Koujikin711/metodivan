@@ -4,10 +4,9 @@ from __future__ import annotations
 
 EXPENSE_BANKS: list[str] = [
     "Касса",
-    "Расчётный счёт",
-    "Карта",
-    "Наличные",
-    "Другое",
+    "дс",
+    "Алиф",
+    "эсхата",
 ]
 
 EXPENSE_ARTICLES: list[str] = [

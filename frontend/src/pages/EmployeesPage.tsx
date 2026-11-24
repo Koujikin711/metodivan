@@ -1183,7 +1183,7 @@ export function EmployeesPage() {
                       className="mo-input"
                     >
                       <option value="">—</option>
-                      {["ДС", "КАССА", "Алиф", "Амонатбонк", "Эсхата"].map((bank) => (
+                      {["Касса", "дс", "Алиф", "эсхата"].map((bank) => (
                         <option key={bank} value={bank}>
                           {bank}
                         </option>

@@ -696,7 +696,7 @@ export function ExpensesPage() {
 
   const [txnDate, setTxnDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [expense, setExpense] = useState("");
-  const [bank, setBank] = useState("ДС");
+  const [bank, setBank] = useState("Касса");
   const [article, setArticle] = useState("ФОТ");
   const [brief, setBrief] = useState("Расход");
   const [detail, setDetail] = useState("");
