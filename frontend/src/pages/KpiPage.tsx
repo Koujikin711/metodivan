@@ -1392,7 +1392,10 @@ export function KpiPage() {
     { id: "company", label: "Отчёт компании", shortLabel: "Отчёт", show: isOwner },
   ];
 
-  const manualPlanItems = (planQuery.data?.items ?? []).filter((x) => x.source_type === "manual");
+  /** Продукты для «Добавить продажу»: и manual, и direction (CRM-DN сид). */
+  const manualPlanItems = (planQuery.data?.items ?? []).filter(
+    (x) => x.source_type === "manual" || x.source_type === "direction",
+  );
   const managers = planQuery.data?.managers ?? [];
 
   const filteredJournal = useMemo(() => {
