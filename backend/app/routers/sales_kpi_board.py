@@ -2057,8 +2057,9 @@ async def create_manual_sale(
     item = await db.get(SalesKpiPlanItem, body.plan_item_id)
     if item is None or item.company_id != company_id or item.pipeline_id != body.pipeline_id:
         raise HTTPException(status_code=400, detail="Продукт плана не найден")
-    if item.source_type != "manual":
-        raise HTTPException(status_code=400, detail="Этот продукт берётся из онлайн-записи, не из формы курса/протокола")
+    # CRM-DN: direction (услуги из онлайн-записи) тоже можно завести формой «Добавить продажу».
+    if item.source_type not in ("manual", "direction"):
+        raise HTTPException(status_code=400, detail="Нельзя выбрать этот тип продукта для продажи KPI")
 
     manager = await db.get(User, body.manager_user_id)
     if manager is None or manager.company_id != company_id or manager.role != UserRole.manager:
@@ -2788,8 +2789,8 @@ async def patch_manual_sale_plan_item(
     item = await db.get(SalesKpiPlanItem, body.plan_item_id)
     if item is None or item.company_id != company_id or int(item.pipeline_id) != int(sale.pipeline_id):
         raise HTTPException(status_code=400, detail="Продукт плана не найден в этой воронке")
-    if item.source_type != "manual":
-        raise HTTPException(status_code=400, detail="Можно выбрать только ручной продукт (курс/протокол)")
+    if item.source_type not in ("manual", "direction"):
+        raise HTTPException(status_code=400, detail="Можно выбрать продукт плана (услуга или курс/протокол)")
 
     before_id = int(sale.plan_item_id)
     next_id = int(body.plan_item_id)

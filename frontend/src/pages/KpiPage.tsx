@@ -1151,7 +1151,7 @@ export function KpiPage() {
     manager_name?: string | null;
   }) {
     const item = (planQuery.data?.items ?? [])
-      .filter((it) => it.source_type === "manual")
+      .filter((it) => it.source_type === "manual" || it.source_type === "direction")
       .find((it) => {
         const n = it.name.toLowerCase();
         if (req.program_kind === "protocol") return n.includes("протокол");
