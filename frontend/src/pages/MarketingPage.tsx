@@ -289,10 +289,7 @@ export function MarketingPage() {
 
   return (
     <div className="marketing-page mo-page">
-      <PageHeader
-        title="Маркетинг"
-        description="Два IG-аккаунта: Ganjina Zamiri и MetodiClinic"
-      />
+      <PageHeader title="Маркетинг" />
 
       {configured && !showConnect ? (
         <div className="marketing-toolbar">

@@ -183,14 +183,14 @@ function buildShellSidebarNavItemsRaw(params: BuildParams): ShellSidebarNavItem[
     ];
   }
 
-  // РОП: только кабинет продаж
+  // РОМ: только кабинет продаж
   if (isRop) {
     return [
       {
         id: "rop-dashboard",
         to: "/rop",
         end: true,
-        title: "Дашборд РОП",
+        title: "Дашборд РОМ",
         labelShort: "Дашборд",
         labelFull: "Дашборд",
         variant: "platform",
@@ -716,9 +716,9 @@ function buildShellSidebarNavItemsRaw(params: BuildParams): ShellSidebarNavItem[
   items.push({
     id: "rop-cabinet",
     to: "/rop",
-    title: "Кабинет РОП",
-    labelShort: "РОП",
-    labelFull: "Кабинет РОП",
+    title: "Кабинет РОМ",
+    labelShort: "РОМ",
+    labelFull: "Кабинет РОМ",
     variant: "platform",
     iconKey: "layout-dashboard",
   });

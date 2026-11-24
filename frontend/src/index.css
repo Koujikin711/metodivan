@@ -5416,15 +5416,27 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   color: var(--mo-text-muted);
 }
 
+/* CRM-DN: светлая тема по умолчанию (карточки как остальной UI). */
 .rop-dense {
+  --rop-card-border: var(--mo-border, #d5dee8);
+  --rop-card-bg: var(--mo-surface-elevated, #ffffff);
+  --rop-card-radius: 0.95rem;
+  --rop-tone-up: #0f766e;
+  --rop-tone-mid: #4338ca;
+  --rop-tone-down: #c2410c;
+  --rop-muted: var(--mo-text-muted, #64748b);
+  gap: 0.7rem;
+  color: var(--mo-text, #0f172a);
+}
+
+html[data-theme="dark"] .rop-dense {
   --rop-card-border: color-mix(in srgb, #7b8fad 22%, transparent);
   --rop-card-bg: color-mix(in srgb, #1c273c 88%, #0b1220);
-  --rop-card-radius: 0.95rem;
   --rop-tone-up: #6ecfad;
   --rop-tone-mid: #9aa3ff;
   --rop-tone-down: #e4b07a;
   --rop-muted: #8e9cb8;
-  gap: 0.7rem;
+  color: var(--mo-text, #e8eef8);
 }
 
 .rop-panel {
