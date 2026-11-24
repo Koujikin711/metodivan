@@ -24,9 +24,13 @@ def is_curator(role: UserRole) -> bool:
 
 
 def expert_also_curator(user) -> bool:
-    """Эксперт, которому на той же учётке включили должность куратора."""
+    """Учётка с флагом куратора: основная роль эксперт, либо доп. эксперт + куратор."""
+    if not bool(getattr(user, "also_curator", False)):
+        return False
     role = getattr(user, "role", None)
-    return role == UserRole.expert and bool(getattr(user, "also_curator", False))
+    if role == UserRole.expert:
+        return True
+    return bool(getattr(user, "also_expert", False))
 
 
 def admin_also_expert(user) -> bool:

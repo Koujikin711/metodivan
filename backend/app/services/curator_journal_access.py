@@ -27,7 +27,11 @@ def can_manage_all_flows(role: UserRole) -> bool:
 
 
 def _expert_curator(user: User) -> bool:
-    return user.role == UserRole.expert and bool(getattr(user, "also_curator", False))
+    if not bool(getattr(user, "also_curator", False)):
+        return False
+    if user.role == UserRole.expert:
+        return True
+    return bool(getattr(user, "also_expert", False))
 
 
 def assert_journal_access(user: User) -> None:

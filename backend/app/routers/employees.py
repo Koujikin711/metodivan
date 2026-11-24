@@ -89,6 +89,8 @@ class InviteEmployeeBody(BaseModel):
     course_stream_max_days: int = Field(15, ge=1, le=90)
     course_stream_min_day_for_next: int = Field(10, ge=1, le=60)
     course_stream_gap_days: int = Field(10, ge=1, le=60)
+    also_expert: bool = False
+    also_curator: bool = False
 
 
 class InviteEmployeeResult(BaseModel):
@@ -737,10 +739,34 @@ async def invite_employee(
     temp_password = _rand_password()
     invite_token = secrets.token_urlsafe(32)
 
+    also_expert = bool(body.also_expert) and body.role != UserRole.expert
+    also_curator = bool(body.also_curator) and (
+        body.role == UserRole.expert or also_expert
+    )
+    if bool(body.also_curator) and not also_curator:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Доп. роль куратора доступна только вместе с экспертом",
+        )
+    if also_expert and body.role not in (
+        UserRole.owner,
+        UserRole.rop,
+        UserRole.manager,
+        UserRole.admin,
+        UserRole.administrator,
+        UserRole.accountant,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Доп. роль «Эксперт» недоступна для этой основной роли",
+        )
+
     if rehire and u is not None:
         u.phone = phone
         u.full_name = body.full_name.strip()
         u.role = body.role
+        u.also_expert = also_expert
+        u.also_curator = also_curator
         u.hashed_password = hash_password(temp_password)
         u.invite_token = invite_token
         u.must_change_password = True
@@ -753,6 +779,8 @@ async def invite_employee(
             phone=phone,
             full_name=body.full_name.strip(),
             role=body.role,
+            also_expert=also_expert,
+            also_curator=also_curator,
             hashed_password=hash_password(temp_password),
             invite_token=invite_token,
             must_change_password=True,
@@ -1003,8 +1031,14 @@ async def patch_employee_contact(
                 UserRole.accountant,
             ):
                 target.also_expert = False
-            if new_role != UserRole.expert:
-                target.also_curator = False
+            # also_curator сбрасываем только если нет ни роли эксперта, ни доп. эксперта
+            # (флаги из body применим ниже)
+            if new_role != UserRole.expert and "also_expert" not in body.model_fields_set:
+                if not bool(getattr(target, "also_expert", False)):
+                    target.also_curator = False
+            elif new_role != UserRole.expert and "also_expert" in body.model_fields_set:
+                if not bool(body.also_expert):
+                    target.also_curator = False
             if old_role == UserRole.expert and new_role != UserRole.expert:
                 spec_row = (
                     await db.execute(
@@ -1040,16 +1074,6 @@ async def patch_employee_contact(
                     )
                 )
 
-    if "also_curator" in body.model_fields_set and body.also_curator is not None:
-        if target.role != UserRole.expert:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Вторая должность куратора доступна только эксперту",
-            )
-        if bool(target.also_curator) != bool(body.also_curator):
-            changed = True
-            target.also_curator = bool(body.also_curator)
-
     if "also_expert" in body.model_fields_set and body.also_expert is not None:
         if target.role not in (
             UserRole.owner,
@@ -1067,6 +1091,19 @@ async def patch_employee_contact(
         if bool(getattr(target, "also_expert", False)) != bool(body.also_expert):
             changed = True
             target.also_expert = bool(body.also_expert)
+            if not body.also_expert and target.role != UserRole.expert:
+                target.also_curator = False
+
+    if "also_curator" in body.model_fields_set and body.also_curator is not None:
+        can_curator = target.role == UserRole.expert or bool(getattr(target, "also_expert", False))
+        if body.also_curator and not can_curator:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Доп. роль куратора доступна с экспертом (основная или доп.)",
+            )
+        if bool(target.also_curator) != bool(body.also_curator):
+            changed = True
+            target.also_curator = bool(body.also_curator)
 
     if body.email is not None:
         normalized = body.email.strip().lower()

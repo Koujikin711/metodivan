@@ -721,7 +721,10 @@ export function KpiPage() {
   const isAdminOrOwner = isOwner || role === "admin" || role === "administrator";
   const isManager = role === "manager";
   const meQuery = useCurrentUserMe();
-  const isCurator = role === "curator" || (role === "expert" && Boolean(meQuery.data?.also_curator));
+  const isCurator =
+    role === "curator" ||
+    (Boolean(meQuery.data?.also_curator) &&
+      (role === "expert" || Boolean(meQuery.data?.also_expert)));
   const isAccountant = role === "accountant";
   /** Снять / поправить ложный долг — владелец, админ и бухгалтер (не РОП). */
   const canFixDebtors =

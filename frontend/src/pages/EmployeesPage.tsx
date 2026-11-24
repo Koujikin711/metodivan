@@ -132,16 +132,17 @@ function pickPrimaryRole(roles: UserRole[]): UserRole {
   return roles[0] ?? "manager";
 }
 
-/** Можно ли добавить second к уже выбранной primary (макс. 2 роли). */
-function canPairAccessRoles(primary: UserRole, second: UserRole): boolean {
-  if (primary === second) return false;
-  if (second === "expert") return primary !== "expert";
-  if (second === "curator") return primary === "expert";
-  if (primary === "expert" && second !== "curator") {
-    // Эксперт как вторая роль к новой основной
-    return true;
-  }
-  return false;
+const MAX_ACCESS_ROLES = 3;
+
+/** Доп. роли: Эксперт и/или Куратор; куратор только вместе с экспертом; основная — одна. */
+function canAddAccessRole(selected: UserRole[], next: UserRole): boolean {
+  if (selected.includes(next)) return false;
+  if (selected.length >= MAX_ACCESS_ROLES) return false;
+  if (next === "expert") return true;
+  if (next === "curator") return selected.includes("expert");
+  const primaries = selected.filter((r) => r !== "expert" && r !== "curator");
+  if (primaries.length >= 1) return false;
+  return true;
 }
 
 export function EmployeesPage() {
@@ -174,12 +175,14 @@ export function EmployeesPage() {
   const [payrollOpen, setPayrollOpen] = useState(false);
   const [payrollName, setPayrollName] = useState("");
   const [payrollRole, setPayrollRole] = useState<UserRole>("expert");
-  const [payrollSpec, setPayrollSpec] = useState(CRM_DN_DEFAULT_SPECIALTY);
+  const [payrollSpec, setPayrollSpec] = useState<string>(CRM_DN_DEFAULT_SPECIALTY);
   const [payrollPhone, setPayrollPhone] = useState("");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState<UserRole>("manager");
+  const [inviteAlsoExpert, setInviteAlsoExpert] = useState(false);
+  const [inviteAlsoCurator, setInviteAlsoCurator] = useState(false);
   const [pipelineIds, setPipelineIds] = useState<number[]>([]);
   const [expertSpecialization, setExpertSpecialization] = useState("");
   const [terminateTarget, setTerminateTarget] = useState<Employee | null>(null);
@@ -401,14 +404,19 @@ export function EmployeesPage() {
       if (phoneTrim.replace(/\D/g, "").length < 7) {
         throw new Error("Укажите телефон — на него уйдёт WhatsApp");
       }
+      const alsoExpert = inviteAlsoExpert && role !== "expert";
+      const alsoCurator =
+        inviteAlsoCurator && (role === "expert" || inviteAlsoExpert);
       const payload: Record<string, unknown> = {
         full_name: fullName.trim(),
         email: emailTrim,
         phone: phoneTrim,
         role,
         pipeline_ids: pipelineIds,
+        also_expert: alsoExpert,
+        also_curator: alsoCurator,
       };
-      if (role === "expert") {
+      if (role === "expert" || alsoExpert) {
         payload.specialization = expertSpecialization.trim();
         payload.course_streams_enabled = false;
       }
@@ -423,6 +431,8 @@ export function EmployeesPage() {
       setEmail("");
       setPhone("");
       setRole("manager");
+      setInviteAlsoExpert(false);
+      setInviteAlsoCurator(false);
       setPipelineIds([]);
       setExpertSpecialization("");
       void qc.invalidateQueries({ queryKey: ["employees"] });
@@ -482,60 +492,87 @@ export function EmployeesPage() {
   const editAccessRoles = useMemo(() => {
     const roles: UserRole[] = [editRole];
     if (editAlsoExpert && editRole !== "expert") roles.push("expert");
-    if (editAlsoCurator && editRole === "expert") roles.push("curator");
+    if (editAlsoCurator && (editRole === "expert" || editAlsoExpert)) roles.push("curator");
     return roles;
   }, [editRole, editAlsoExpert, editAlsoCurator]);
 
-  function applyEditAccessRoles(nextRoles: UserRole[]) {
+  const inviteAccessRoles = useMemo(() => {
+    const roles: UserRole[] = [role];
+    if (inviteAlsoExpert && role !== "expert") roles.push("expert");
+    if (inviteAlsoCurator && (role === "expert" || inviteAlsoExpert)) roles.push("curator");
+    return roles;
+  }, [role, inviteAlsoExpert, inviteAlsoCurator]);
+
+  function applyAccessRoles(
+    nextRoles: UserRole[],
+    setPrimary: (r: UserRole) => void,
+    setAlsoExpert: (v: boolean) => void,
+    setAlsoCurator: (v: boolean) => void,
+  ) {
     if (nextRoles.length === 0) return;
-    const primary = pickPrimaryRole(nextRoles);
-    setEditRole(primary);
+    let roles = [...nextRoles];
+    if (roles.includes("curator") && !roles.includes("expert")) {
+      if (roles.length < MAX_ACCESS_ROLES) roles.push("expert");
+      else roles = roles.filter((r) => r !== "curator");
+    }
+    const primary = pickPrimaryRole(roles);
+    setPrimary(primary);
     if (primary === "expert") {
-      setEditAlsoCurator(nextRoles.includes("curator"));
-      // also_expert for expert = «окно эксперта», не трогаем здесь
+      setAlsoExpert(false);
+      setAlsoCurator(roles.includes("curator"));
     } else {
-      setEditAlsoExpert(nextRoles.includes("expert"));
-      setEditAlsoCurator(false);
+      setAlsoExpert(roles.includes("expert"));
+      setAlsoCurator(roles.includes("curator") && roles.includes("expert"));
     }
   }
 
-  function toggleEditAccessRole(role: UserRole) {
-    const selected = editAccessRoles;
-    if (selected.includes(role)) {
-      const next = selected.filter((r) => r !== role);
+  function toggleAccessRole(
+    selected: UserRole[],
+    nextRole: UserRole,
+    apply: (roles: UserRole[]) => void,
+  ) {
+    if (selected.includes(nextRole)) {
+      let next = selected.filter((r) => r !== nextRole);
+      if (nextRole === "expert") next = next.filter((r) => r !== "curator");
       if (next.length === 0) {
         toast.error("Нужна хотя бы одна роль");
         return;
       }
-      applyEditAccessRoles(next);
+      apply(next);
       return;
     }
-    if (selected.length >= 2) {
-      toast.error("Можно выбрать только 2 роли — снимите одну");
+    if (selected.length >= MAX_ACCESS_ROLES) {
+      toast.error("Можно выбрать не больше 3 ролей — снимите одну");
       return;
     }
-    if (selected.length === 1) {
-      const primary = selected[0]!;
-      if (role === "expert" && primary !== "expert") {
-        applyEditAccessRoles([primary, "expert"]);
-        return;
+    if (!canAddAccessRole(selected, nextRole)) {
+      if (nextRole === "curator") {
+        toast.error("Куратор только вместе с Экспертом (до 3 ролей: основная + эксперт + куратор)");
+      } else {
+        toast.error("Доп. роли: Эксперт и Куратор. Основная — одна.");
       }
-      if (role === "curator" && primary === "expert") {
-        applyEditAccessRoles(["expert", "curator"]);
-        return;
-      }
-      if (primary === "expert" && role !== "curator") {
-        applyEditAccessRoles([role, "expert"]);
-        return;
-      }
-      if (!canPairAccessRoles(primary, role)) {
-        toast.error("Вторая роль: Эксперт (или Куратор вместе с Экспертом)");
-        return;
-      }
-      applyEditAccessRoles([primary, role]);
       return;
     }
-    applyEditAccessRoles([role]);
+    apply([...selected, nextRole]);
+  }
+
+  function applyEditAccessRoles(nextRoles: UserRole[]) {
+    applyAccessRoles(nextRoles, setEditRole, setEditAlsoExpert, setEditAlsoCurator);
+  }
+
+  function toggleEditAccessRole(r: UserRole) {
+    toggleAccessRole(editAccessRoles, r, applyEditAccessRoles);
+  }
+
+  function applyInviteAccessRoles(nextRoles: UserRole[]) {
+    applyAccessRoles(nextRoles, setRole, setInviteAlsoExpert, setInviteAlsoCurator);
+    if (!nextRoles.includes("expert")) {
+      setExpertSpecialization("");
+    }
+  }
+
+  function toggleInviteAccessRole(r: UserRole) {
+    toggleAccessRole(inviteAccessRoles, r, applyInviteAccessRoles);
   }
 
   function toggleEditPipeline(id: number) {
@@ -613,10 +650,12 @@ export function EmployeesPage() {
           ...(roleChanged ? { role: editRole } : {}),
           ...(editRole === "expert" ? { specialization: editSpecialization.trim() } : {}),
           ...(alsoExpertChanged || roleChanged ? { also_expert: editAlsoExpert } : {}),
-          ...(editRole === "expert" && (alsoCuratorChanged || roleChanged)
-            ? { also_curator: editAlsoCurator }
+          ...(alsoCuratorChanged || alsoExpertChanged || roleChanged
+            ? {
+                also_curator:
+                  editAlsoCurator && (editRole === "expert" || editAlsoExpert),
+              }
             : {}),
-          ...(roleChanged && editRole !== "expert" ? { also_curator: false } : {}),
           base_salary: editSalary.trim() ? Number(editSalary) : null,
           payout_bank: editPayoutBank.trim() || null,
         });
@@ -1068,7 +1107,9 @@ export function EmployeesPage() {
                 </label>
                 <div className="employee-edit-field mt-3">
                   <span>Уровень доступа</span>
-                  <p className="mt-1 text-[11px] mo-muted">До двух ролей. Вторая — Эксперт (или Куратор с Экспертом).</p>
+                  <p className="mt-1 text-[11px] mo-muted">
+                    1–3 роли: основная + при желании Эксперт и Куратор (куратор только с экспертом).
+                  </p>
                   <div
                     className="mt-2 grid gap-2 sm:grid-cols-2"
                     role="group"
@@ -1386,31 +1427,30 @@ export function EmployeesPage() {
                 />
               </label>
 
-              <label className="text-sm mo-muted">
-                Роль
-                <select
-                  value={role}
-                  onChange={(e) => {
-                    const next = e.target.value as UserRole;
-                    setRole(next);
-                    if (next !== "expert") {
-                      setExpertSpecialization("");
-                    }
-                  }}
-                  className="mo-input mt-1 w-full"
+              <div className="text-sm mo-muted">
+                <span>Уровень доступа</span>
+                <p className="mt-1 text-[11px]">
+                  1–3 роли: основная + при желании Эксперт и Куратор (куратор только с экспертом).
+                </p>
+                <div
+                  className="mt-2 grid gap-2 sm:grid-cols-2"
+                  role="group"
+                  aria-label="Уровень доступа"
                 >
-                  <option value="owner">Владелец</option>
-                  <option value="manager">Менеджер</option>
-                  <option value="rop">РОП</option>
-                  <option value="expert">Эксперт</option>
-                  <option value="admin">Админ воронки</option>
-                  <option value="administrator">Администратор</option>
-                  <option value="curator">Куратор</option>
-                  <option value="accountant">Бухгалтер</option>
-                </select>
-              </label>
+                  {EDIT_ACCESS_ROLES.map((r) => (
+                    <label key={r} className="flex items-center gap-2 text-sm text-[var(--mo-text)]">
+                      <input
+                        type="checkbox"
+                        checked={inviteAccessRoles.includes(r)}
+                        onChange={() => toggleInviteAccessRole(r)}
+                      />
+                      <span>{roleLabel(r)}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
 
-              {role === "expert" && (
+              {(role === "expert" || inviteAlsoExpert) && (
                 <label className="text-sm mo-muted">
                   Специальность (под ФИО в календаре)
                   <input

@@ -458,7 +458,9 @@ async def payroll_sheet(
         profiles[uid] = profile
         card_salary = Decimal(str(user.base_salary)) if user.base_salary is not None else None
         facts = replace(facts_by_user.get(uid), kpi_bonus=bonus_by_id.get(uid, Decimal("0")))
-        also_curator = role == "expert" and bool(getattr(user, "also_curator", False))
+        also_curator = bool(getattr(user, "also_curator", False)) and (
+            role == "expert" or bool(getattr(user, "also_expert", False))
+        )
         accrued = accrue_with_extra_curator(
             profile,
             facts,

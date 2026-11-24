@@ -49,8 +49,9 @@ export function MainLayout() {
   const isRop = role === "rop";
   const isExpert = role === "expert";
   const meQuery = useCurrentUserMe();
-  const alsoCurator = isExpert && Boolean(meQuery.data?.also_curator);
   const alsoExpert = Boolean(meQuery.data?.also_expert);
+  const alsoCurator =
+    Boolean(meQuery.data?.also_curator) && (isExpert || alsoExpert);
   const isChiefExpert = Boolean(meQuery.data?.is_chief_expert);
   const isExpertElevated = isExpert && isChiefExpert;
   const isManagerLikeNav = isManagerNav || isExpertElevated;

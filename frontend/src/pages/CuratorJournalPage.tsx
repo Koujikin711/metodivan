@@ -340,7 +340,9 @@ function JournalIconButton({
 export function CuratorJournalPage() {
   const role = decodeRoleFromToken(getStoredToken());
   const meQuery = useCurrentUserMe();
-  const alsoCurator = role === "expert" && Boolean(meQuery.data?.also_curator);
+  const alsoCurator =
+    Boolean(meQuery.data?.also_curator) &&
+    (role === "expert" || Boolean(meQuery.data?.also_expert));
   const allowed = canAccessCuratorJournal(role, alsoCurator);
   const canManageFlows =
     role === "owner" ||
