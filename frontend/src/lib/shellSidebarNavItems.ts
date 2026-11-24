@@ -578,7 +578,7 @@ function buildShellSidebarNavItemsRaw(params: BuildParams): ShellSidebarNavItem[
         title: "Кабинет РОМ",
         labelShort: "РОМ",
         labelFull: "Кабинет РОМ",
-        variant: "purple",
+        variant: "teal",
         iconKey: "bar-chart",
       });
     }
@@ -784,7 +784,7 @@ function buildShellSidebarNavItemsRaw(params: BuildParams): ShellSidebarNavItem[
       title: "Кабинет РОМ",
       labelShort: "РОМ",
       labelFull: "Кабинет РОМ",
-      variant: "purple",
+      variant: "teal",
       iconKey: "bar-chart",
     });
   }

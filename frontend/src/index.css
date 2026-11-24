@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-display: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --color-lux-ivory: #f8fafc;
-  --color-lux-ivory-deep: #eef2f9;
-  --color-lux-sidebar: #e8edf7;
-  --color-lux-gold: #6366f1;
-  --color-lux-bronze: #4f46e5;
-  --color-lux-charcoal: #0f172a;
-  --color-lux-taupe: #64748b;
+  --font-sans: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --color-lux-ivory: #f3f7f6;
+  --color-lux-ivory-deep: #e6efed;
+  --color-lux-sidebar: #dfeae7;
+  --color-lux-gold: #0f766e;
+  --color-lux-bronze: #0d5c56;
+  --color-lux-charcoal: #10231f;
+  --color-lux-taupe: #5b6b67;
   /* Remap legacy slate-* utilities to modern cool palette */
   --color-slate-50: #f8fafc;
   --color-slate-100: #f1f5f9;
@@ -27,8 +27,8 @@
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
-  /* Единая типографика MetodiOne */
-  --mo-font: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* CRM-DN: Manrope + teal sales palette */
+  --mo-font: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mo-text-2xs: 0.6875rem; /* 11px — минимум для подписей */
   --mo-text-xs: 0.75rem; /* 12px */
   --mo-text-sm: 0.8125rem; /* 13px */
@@ -39,33 +39,33 @@
   --mo-text-2xl: 1.5rem; /* 24px */
   --mo-leading: 1.45;
   --mo-leading-tight: 1.25;
-  --mo-canvas: #eef2f9;
-  --mo-bg: #eef2f9;
-  --mo-bg-top: #e8edf7;
-  --mo-surface: #f4f7fc;
+  --mo-canvas: #e8f1ef;
+  --mo-bg: #e8f1ef;
+  --mo-bg-top: #dceae6;
+  --mo-surface: #f2f8f6;
   --mo-surface-elevated: #ffffff;
-  --mo-border: #dbe2ef;
-  --mo-border-strong: #c8d3e6;
-  --mo-text: #0f172a;
-  --mo-text-muted: #475569;
-  --mo-accent: #6366f1;
-  --mo-accent-hover: #4f46e5;
-  --mo-accent-soft: #eef2ff;
-  --mo-gold: #818cf8;
-  --mo-shadow-luxury: 0 4px 24px -6px rgba(99, 102, 241, 0.1), 0 2px 10px -4px rgba(15, 23, 42, 0.06);
-  --mo-plum-from: #6366f1;
-  --mo-plum-to: #4f46e5;
-  --mo-success: #059669;
-  --mo-warning: #d97706;
+  --mo-border: #c9ddd7;
+  --mo-border-strong: #a9c7be;
+  --mo-text: #10231f;
+  --mo-text-muted: #4d5f5a;
+  --mo-accent: #0f766e;
+  --mo-accent-hover: #0b5f59;
+  --mo-accent-soft: #d8f3ee;
+  --mo-gold: #14b8a6;
+  --mo-shadow-luxury: 0 10px 28px -12px rgba(15, 55, 48, 0.18), 0 2px 8px -4px rgba(16, 35, 31, 0.08);
+  --mo-plum-from: #0f766e;
+  --mo-plum-to: #0d9488;
+  --mo-success: #047857;
+  --mo-warning: #c2410c;
   --mo-danger: #dc2626;
   --mo-shell-bg: var(--mo-canvas);
-  --mo-nav-hover: #e8edf7;
+  --mo-nav-hover: #dceae6;
   --mo-nav-active-bg: #ffffff;
-  --mo-sidebar-fg: #1e293b;
-  --mo-sidebar-fg-muted: #64748b;
-  --mo-sidebar-item-hover: rgba(99, 102, 241, 0.1);
+  --mo-sidebar-fg: #16332e;
+  --mo-sidebar-fg-muted: #5b6b67;
+  --mo-sidebar-item-hover: rgba(15, 118, 110, 0.12);
   --mo-sidebar-item-active: #ffffff;
-  --mo-sidebar-border: #dbe2ef;
+  --mo-sidebar-border: #c9ddd7;
   --mo-sidebar-shadow: none;
   --booking-grid-hatch: rgba(148, 163, 184, 0.18);
   --booking-appt-booked-bg: #dbeafe;
@@ -112,7 +112,7 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --mo-font: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mo-font: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mo-text-2xs: 0.6875rem;
   --mo-text-xs: 0.75rem;
   --mo-text-sm: 0.8125rem;
@@ -123,34 +123,33 @@
   --mo-text-2xl: 1.5rem;
   --mo-leading: 1.5;
   --mo-leading-tight: 1.28;
-  /* Мягче для глаз: не «чёрная дыра», текст и вторичка читаемее */
-  --mo-canvas: #10182a;
-  --mo-bg: #10182a;
-  --mo-bg-top: #182238;
-  --mo-surface: #18233a;
-  --mo-surface-elevated: #1e2a44;
-  --mo-border: rgba(186, 198, 220, 0.26);
-  --mo-border-strong: rgba(186, 198, 255, 0.38);
-  --mo-text: #f4f7fc;
-  --mo-text-muted: #c9d4e6;
-  --mo-accent: #8b97f8;
-  --mo-accent-hover: #b4bffc;
-  --mo-accent-soft: rgba(99, 102, 241, 0.18);
-  --mo-gold: #d0c4fe;
-  --mo-shadow-luxury: 0 8px 32px -10px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(99, 102, 241, 0.12);
-  --mo-plum-from: #818cf8;
-  --mo-plum-to: #6366f1;
+  --mo-canvas: #0c1a18;
+  --mo-bg: #0c1a18;
+  --mo-bg-top: #122522;
+  --mo-surface: #152a26;
+  --mo-surface-elevated: #1b342f;
+  --mo-border: rgba(167, 210, 198, 0.22);
+  --mo-border-strong: rgba(167, 210, 198, 0.36);
+  --mo-text: #eef7f4;
+  --mo-text-muted: #a9c4bc;
+  --mo-accent: #2dd4bf;
+  --mo-accent-hover: #5eead4;
+  --mo-accent-soft: rgba(45, 212, 191, 0.16);
+  --mo-gold: #99f6e4;
+  --mo-shadow-luxury: 0 8px 32px -10px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(45, 212, 191, 0.12);
+  --mo-plum-from: #2dd4bf;
+  --mo-plum-to: #14b8a6;
   --mo-success: #4ade80;
   --mo-warning: #fcd34d;
   --mo-danger: #fb7185;
   --mo-shell-bg: var(--mo-canvas);
-  --mo-nav-hover: rgba(99, 102, 241, 0.14);
-  --mo-nav-active-bg: rgba(99, 102, 241, 0.24);
-  --mo-sidebar-fg: #f1f5f9;
-  --mo-sidebar-fg-muted: #b6c3d8;
-  --mo-sidebar-item-hover: rgba(99, 102, 241, 0.16);
-  --mo-sidebar-item-active: rgba(36, 48, 74, 0.95);
-  --mo-sidebar-border: rgba(129, 140, 248, 0.28);
+  --mo-nav-hover: rgba(45, 212, 191, 0.12);
+  --mo-nav-active-bg: rgba(45, 212, 191, 0.22);
+  --mo-sidebar-fg: #eef7f4;
+  --mo-sidebar-fg-muted: #a9c4bc;
+  --mo-sidebar-item-hover: rgba(45, 212, 191, 0.14);
+  --mo-sidebar-item-active: rgba(27, 52, 47, 0.95);
+  --mo-sidebar-border: rgba(45, 212, 191, 0.24);
   --mo-sidebar-shadow: none;
   --booking-grid-hatch: rgba(255, 255, 255, 0.06);
   --booking-appt-booked-bg: #1e3a5f;
@@ -4392,51 +4391,58 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .crm-brand-title {
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
   @apply text-lg font-semibold leading-tight tracking-tight sm:text-2xl;
-  color: var(--mo-accent);
+  color: var(--mo-text);
+  letter-spacing: -0.02em;
 }
 
 .crm-pill-btn {
-  @apply rounded-full border px-2 py-1 text-[11px] font-semibold transition sm:px-3.5 sm:py-1.5 sm:text-sm;
+  @apply rounded-xl border px-2 py-1 text-[11px] font-semibold transition sm:px-3.5 sm:py-1.5 sm:text-sm;
   border-color: var(--mo-border-strong);
-  background: var(--mo-surface);
+  background: var(--mo-surface-elevated);
   color: var(--mo-text);
   box-shadow: none;
 }
 .crm-pill-btn:hover {
   background: var(--mo-accent-soft);
-  border-color: var(--mo-gold);
+  border-color: var(--mo-accent);
   color: var(--mo-text);
 }
 
 .crm-pill-btn--primary {
-  border-color: var(--mo-accent);
-  background: var(--mo-accent-soft);
-  color: var(--mo-accent-hover);
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--mo-plum-from), var(--mo-plum-to));
+  color: #fff;
+}
+
+.crm-pill-btn--primary:hover {
+  border-color: transparent;
+  color: #fff;
+  filter: brightness(1.05);
 }
 
 .crm-pill-btn--active {
-  border-color: var(--mo-gold);
+  border-color: var(--mo-accent);
   background: var(--mo-accent-soft);
-  color: var(--mo-text);
-  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.12);
+  color: var(--mo-accent-hover);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mo-accent) 25%, transparent);
 }
 
 .crm-view-switch {
-  @apply inline-flex rounded-full border p-0.5;
+  @apply inline-flex rounded-xl border p-0.5;
   border-color: var(--mo-border);
-  background: transparent;
+  background: var(--mo-surface-elevated);
   box-shadow: none;
 }
 
 .crm-view-switch button {
-  @apply rounded-full px-3 py-1 text-xs font-semibold transition sm:px-3.5 sm:text-sm;
+  @apply rounded-lg px-3 py-1 text-xs font-semibold transition sm:px-3.5 sm:text-sm;
   color: var(--mo-text-muted);
 }
 .crm-view-switch button[data-active="true"] {
-  background-color: var(--mo-accent-soft);
-  color: var(--mo-text);
+  background-color: var(--mo-accent);
+  color: #fff;
   border: 1px solid transparent;
   box-shadow: none;
 }
@@ -4446,9 +4452,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .crm-search-input {
-  @apply w-full rounded-lg border px-3 py-1.5 text-sm outline-none transition;
+  @apply w-full rounded-xl border px-3 py-1.5 text-sm outline-none transition;
   border-color: var(--mo-border-strong);
-  background: var(--mo-surface);
+  background: var(--mo-surface-elevated);
   color: var(--mo-text);
   box-shadow: none;
 }
@@ -4458,7 +4464,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 .crm-search-input:focus {
   border-color: var(--mo-accent);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mo-accent) 22%, transparent);
 }
 
 :root[data-theme="dark"] .crm-toolbar__bar {
@@ -4699,9 +4705,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   height: 100%;
   max-height: 100%;
   min-height: 16rem;
-  border-color: var(--mo-border);
-  background-color: var(--mo-surface);
-  box-shadow: none;
+  border-color: color-mix(in srgb, var(--mo-border) 80%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--mo-surface-elevated) 88%, transparent), var(--mo-surface));
+  box-shadow: var(--mo-shadow-luxury);
 }
 
 @media (min-width: 640px) {
@@ -4712,13 +4719,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .crm-kanban-col.is-drop-target {
   border-color: var(--mo-accent);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.28);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mo-accent) 35%, transparent);
 }
 
 .crm-kanban-col-header {
   @apply flex items-center gap-2 border-b px-3 py-2.5;
-  border-color: var(--mo-border);
-  background-color: var(--mo-surface-elevated);
+  border-color: color-mix(in srgb, var(--mo-border) 70%, transparent);
+  background-color: color-mix(in srgb, var(--mo-surface-elevated) 92%, var(--mo-accent-soft));
   color: var(--mo-text);
   cursor: grab;
   touch-action: none;
@@ -4761,15 +4768,16 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .crm-lead-card {
   @apply relative cursor-grab touch-pan-y overflow-hidden rounded-xl border p-3.5 transition active:cursor-grabbing;
-  border-color: var(--mo-border);
+  border-color: color-mix(in srgb, var(--mo-border) 85%, transparent);
   background-color: var(--mo-surface-elevated);
   color: var(--mo-text);
-  box-shadow: none;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--mo-border) 55%, transparent);
   flex-shrink: 0;
 }
 .crm-lead-card:hover {
-  border-color: var(--mo-border-strong);
-  box-shadow: none;
+  border-color: var(--mo-accent);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px -12px rgba(16, 35, 31, 0.28);
 }
 .crm-lead-card.is-dragging {
   opacity: 0.58;
