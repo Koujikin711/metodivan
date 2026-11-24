@@ -181,10 +181,6 @@ export function EmployeesPage() {
   const [role, setRole] = useState<UserRole>("manager");
   const [pipelineIds, setPipelineIds] = useState<number[]>([]);
   const [expertSpecialization, setExpertSpecialization] = useState("");
-  const [courseStreamsEnabled, setCourseStreamsEnabled] = useState(false);
-  const [courseStreamMaxDays, setCourseStreamMaxDays] = useState(15);
-  const [courseStreamMinDay, setCourseStreamMinDay] = useState(10);
-  const [courseStreamGapDays, setCourseStreamGapDays] = useState(10);
   const [terminateTarget, setTerminateTarget] = useState<Employee | null>(null);
   const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
   const [editFullName, setEditFullName] = useState("");
@@ -413,10 +409,7 @@ export function EmployeesPage() {
       };
       if (role === "expert") {
         payload.specialization = expertSpecialization.trim();
-        payload.course_streams_enabled = courseStreamsEnabled;
-        payload.course_stream_max_days = courseStreamMaxDays;
-        payload.course_stream_min_day_for_next = courseStreamMinDay;
-        payload.course_stream_gap_days = courseStreamGapDays;
+        payload.course_streams_enabled = false;
       }
       return apiFetch<InviteResult>("/api/employees/invite", {
         method: "POST",
@@ -431,10 +424,6 @@ export function EmployeesPage() {
       setRole("manager");
       setPipelineIds([]);
       setExpertSpecialization("");
-      setCourseStreamsEnabled(false);
-      setCourseStreamMaxDays(15);
-      setCourseStreamMinDay(10);
-      setCourseStreamGapDays(10);
       void qc.invalidateQueries({ queryKey: ["employees"] });
       void qc.invalidateQueries({ queryKey: ["booking-specialists"] });
       setInviteResult(r);
@@ -1425,59 +1414,15 @@ export function EmployeesPage() {
               </label>
 
               {role === "expert" && (
-                <>
-                  <label className="text-sm mo-muted">
-                    Специальность (под ФИО в календаре)
-                    <input
-                      value={expertSpecialization}
-                      onChange={(e) => setExpertSpecialization(e.target.value)}
-                      placeholder="Например: Невролог"
-                      className="mo-input mt-1 w-full placeholder:mo-muted"
-                    />
-                  </label>
-                  <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-3">
-                    <label className="flex cursor-pointer items-start gap-2 text-sm text-[var(--mo-text)]">
-                      <input
-                        type="checkbox"
-                        checked={courseStreamsEnabled}
-                        onChange={(e) => setCourseStreamsEnabled(e.target.checked)}
-                        className="mt-1"
-                      />
-                      <span>
-                        <span className="font-medium">Курсы / потоки (1:1, 1:10, 2:1)</span>
-                        <span className="mt-0.5 block text-xs mo-muted">
-                          Считать сеансы по потокам для 15‑дневных курсов. Настройки можно изменить в календаре записи.
-                        </span>
-                      </span>
-                    </label>
-                    {courseStreamsEnabled && (
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                        <label className="text-xs mo-muted" title="Количество приёмов в одном потоке">
-                          День
-                          <input
-                            type="number"
-                            min={1}
-                            max={90}
-                            value={courseStreamMaxDays}
-                            onChange={(e) => setCourseStreamMaxDays(Number(e.target.value))}
-                            className="mo-input mt-1 w-full tabular-nums"
-                          />
-                        </label>
-                        <label className="text-xs mo-muted" title="Через сколько дней без визита снова начинать процедуру">
-                          Пауза
-                          <input
-                            type="number"
-                            min={1}
-                            max={60}
-                            value={courseStreamGapDays}
-                            onChange={(e) => setCourseStreamGapDays(Number(e.target.value))}
-                            className="mo-input mt-1 w-full tabular-nums"
-                          />
-                        </label>
-                      </div>
-                    )}
-                  </div>
-                </>
+                <label className="text-sm mo-muted">
+                  Специальность (под ФИО в календаре)
+                  <input
+                    value={expertSpecialization}
+                    onChange={(e) => setExpertSpecialization(e.target.value)}
+                    placeholder="Например: Консультант"
+                    className="mo-input mt-1 w-full placeholder:mo-muted"
+                  />
+                </label>
               )}
 
               <div className="rounded-2xl border border-[var(--mo-border)] bg-[var(--mo-surface)] p-3">

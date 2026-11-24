@@ -100,10 +100,6 @@ export function SpecialistModal({
   const [workStart, setWorkStart] = useState(9);
   const [workEnd, setWorkEnd] = useState(18);
   const [workWeekdays, setWorkWeekdays] = useState<number[]>([...DEFAULT_WEEKDAYS]);
-  const [courseStreamsEnabled, setCourseStreamsEnabled] = useState(false);
-  const [courseStreamMaxDays, setCourseStreamMaxDays] = useState(15);
-  const [courseStreamMinDay, setCourseStreamMinDay] = useState(10);
-  const [courseStreamGapDays, setCourseStreamGapDays] = useState(10);
   const [creatingDirection, setCreatingDirection] = useState(false);
 
   const visibleDirections = useMemo(
@@ -125,10 +121,6 @@ export function SpecialistModal({
       setWorkStart(initial.work_start_hour ?? 9);
       setWorkEnd(initial.work_end_hour ?? 18);
       setWorkWeekdays(normWeekdays(initial.work_weekdays));
-      setCourseStreamsEnabled(Boolean(initial.course_streams_enabled));
-      setCourseStreamMaxDays(initial.course_stream_max_days ?? 15);
-      setCourseStreamMinDay(initial.course_stream_min_day_for_next ?? 10);
-      setCourseStreamGapDays(initial.course_stream_gap_days ?? 10);
     } else {
       setFullName("");
       setPhone("");
@@ -138,10 +130,6 @@ export function SpecialistModal({
       setWorkStart(9);
       setWorkEnd(18);
       setWorkWeekdays([...DEFAULT_WEEKDAYS]);
-      setCourseStreamsEnabled(false);
-      setCourseStreamMaxDays(15);
-      setCourseStreamMinDay(10);
-      setCourseStreamGapDays(10);
     }
     // Направления приходят отдельным запросом: не сбрасывать уже введённое имя.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -259,10 +247,10 @@ export function SpecialistModal({
       work_start_hour: workStart,
       work_end_hour: workEnd,
       work_weekdays: [...workWeekdays],
-      course_streams_enabled: courseStreamsEnabled,
-      course_stream_max_days: courseStreamMaxDays,
-      course_stream_min_day_for_next: courseStreamMinDay,
-      course_stream_gap_days: courseStreamGapDays,
+      course_streams_enabled: false,
+      course_stream_max_days: 15,
+      course_stream_min_day_for_next: 10,
+      course_stream_gap_days: 10,
     });
   }
 
@@ -380,55 +368,6 @@ export function SpecialistModal({
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-3">
-            <label className="flex cursor-pointer items-start gap-2 text-sm text-[var(--mo-text)]">
-              <input
-                type="checkbox"
-                checked={courseStreamsEnabled}
-                onChange={(e) => setCourseStreamsEnabled(e.target.checked)}
-                className="mt-1"
-              />
-              <span>
-                <span className="font-medium">Курсы / потоки</span>
-                <span className="mt-0.5 block text-xs mo-muted">
-                  Сеанс как 1:1, 1:10, 2:1 (поток : день в потоке). Для 15‑дневных курсов.
-                </span>
-              </span>
-            </label>
-            {courseStreamsEnabled && (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <label className="text-center text-xs mo-muted" title="Количество приёмов в одном потоке">
-                  <span className="block leading-4">День</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={90}
-                    value={courseStreamMaxDays}
-                    onChange={(e) => setCourseStreamMaxDays(Number(e.target.value))}
-                    className="mo-input mt-1 w-full text-center tabular-nums"
-                  />
-                </label>
-                <label className="text-center text-xs mo-muted" title="Через сколько дней без визита снова начинать процедуру">
-                  <span className="block leading-4">Пауза</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={60}
-                    value={courseStreamGapDays}
-                    onChange={(e) => setCourseStreamGapDays(Number(e.target.value))}
-                    className="mo-input mt-1 w-full text-center tabular-nums"
-                  />
-                </label>
-              </div>
-            )}
-            {courseStreamsEnabled && (
-              <p className="mt-2 text-[10px] leading-snug mo-muted">
-                День — число приёмов в потоке. Длительность сеанса — в «Длительность записи» выше. Пауза — через
-                сколько дней без визита снова начинать ({courseStreamGapDays} дн.).
-              </p>
-            )}
           </div>
 
           <div className="block text-sm mo-muted">

@@ -437,19 +437,8 @@ export function OnlineBookingPage() {
     const list = specialistsQuery.data?.filter((s) => s.is_active) ?? [];
     return list.find((x) => x.id === specialistId);
   }, [specialistsQuery.data, specialistId]);
-  const courseStreamsForForm = useMemo(() => {
-    if (!selectedSpecialistForForm) return false;
-    const selectedDir =
-      serviceDirectionId !== ""
-        ? directionsQuery.data?.find((d) => d.id === serviceDirectionId)
-        : undefined;
-    if (selectedDir?.course_streams_enabled) return true;
-    const primaryDir = directionsQuery.data?.find(
-      (d) => d.id === selectedSpecialistForForm.direction_id,
-    );
-    if (primaryDir?.course_streams_enabled) return true;
-    return Boolean(selectedSpecialistForForm.course_streams_enabled);
-  }, [selectedSpecialistForForm, directionsQuery.data, serviceDirectionId]);
+  /** CRM-DN: потоки курсов отключены — только продукты записи. */
+  const courseStreamsForForm = false;
   const seriesEndDateYmd = useMemo(() => {
     if (!startAt || !seriesBookingEnabled || consecutiveDays < 2) return null;
     const m = startAt.match(/^(\d{4}-\d{2}-\d{2})/);
@@ -1278,10 +1267,10 @@ export function OnlineBookingPage() {
       work_start_hour: values.work_start_hour,
       work_end_hour: values.work_end_hour,
       work_weekdays: values.work_weekdays,
-      course_streams_enabled: values.course_streams_enabled,
-      course_stream_max_days: values.course_stream_max_days,
-      course_stream_min_day_for_next: values.course_stream_min_day_for_next,
-      course_stream_gap_days: values.course_stream_gap_days,
+      course_streams_enabled: false,
+      course_stream_max_days: 15,
+      course_stream_min_day_for_next: 10,
+      course_stream_gap_days: 10,
     };
   }
 
