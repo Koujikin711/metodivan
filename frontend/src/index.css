@@ -7631,6 +7631,28 @@ fieldset.extra-services-field {
   filter: drop-shadow(0 16px 26px color-mix(in srgb, #000 40%, transparent));
 }
 
+.server-down__robot--svg {
+  max-width: 15rem;
+  margin-inline: auto;
+}
+
+.server-down__eye {
+  transform-origin: center;
+  animation: server-down-blink 3.2s ease-in-out infinite;
+}
+
+@keyframes server-down-blink {
+  0%,
+  42%,
+  48%,
+  100% {
+    transform: scaleY(1);
+  }
+  45% {
+    transform: scaleY(0.12);
+  }
+}
+
 .server-down__eyebrow {
   position: relative;
   z-index: 1;
