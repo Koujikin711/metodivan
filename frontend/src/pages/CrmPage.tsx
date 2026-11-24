@@ -53,6 +53,9 @@ import type {
   UserRole,
 } from "@/lib/types";
 
+/** Основные источники CRM-DN — всегда сверху в создании лида. */
+const CRM_DN_SOURCE_DEFAULTS = ["Инстаграм", "Фейсбук", "Вотсап"] as const;
+
 function stageDroppableId(stageId: number) {
   return `stage-${stageId}`;
 }
@@ -830,6 +833,20 @@ export function CrmPage() {
     queryKey: ["lead-sources"],
     queryFn: () => apiFetch<LeadSource[]>("/api/sources"),
   });
+
+  const createLeadSourceOptions = useMemo(() => {
+    const fromApi = (sourcesQuery.data ?? []).filter((s) => s.is_active);
+    const names = new Set(fromApi.map((s) => s.name));
+    const pinned: LeadSource[] = CRM_DN_SOURCE_DEFAULTS.filter((name) => !names.has(name)).map(
+      (name, i) => ({ id: -1000 - i, name, is_active: true }),
+    );
+    const preferred = CRM_DN_SOURCE_DEFAULTS.flatMap((name) => {
+      const hit = fromApi.find((s) => s.name === name);
+      return hit ? [hit] : pinned.filter((s) => s.name === name);
+    });
+    const rest = fromApi.filter((s) => !(CRM_DN_SOURCE_DEFAULTS as readonly string[]).includes(s.name));
+    return [...preferred, ...rest];
+  }, [sourcesQuery.data]);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [createLeadOpen, setCreateLeadOpen] = useState(false);
@@ -2759,13 +2776,11 @@ export function CrmPage() {
                   className="mo-input mt-1 w-full"
                 >
                   <option value="">— выберите источник —</option>
-                  {(sourcesQuery.data ?? [])
-                    .filter((s) => s.is_active)
-                    .map((s) => (
-                      <option key={s.id} value={s.name}>
-                        {s.name}
-                      </option>
-                    ))}
+                  {createLeadSourceOptions.map((s) => (
+                    <option key={s.id} value={s.name}>
+                      {s.name}
+                    </option>
+                  ))}
                   <option value="__custom__">Свой источник…</option>
                 </select>
                 {leadSourceMode === "custom" ? (
@@ -2778,7 +2793,7 @@ export function CrmPage() {
                   />
                 ) : null}
                 <p className="mt-1 text-[11px] mo-muted">
-                  Можно выбрать из списка или указать свой источник.
+                  Инстаграм, Фейсбук, Вотсап — или свой источник.
                 </p>
               </div>
 

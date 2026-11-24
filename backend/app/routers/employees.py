@@ -531,7 +531,12 @@ async def list_employees(
 ) -> list[EmployeeRead]:
     await assert_owner_admin_or_chief_expert(db, current_user, detail="Недостаточно прав для просмотра сотрудников")
     r = await db.execute(select(User).where(User.company_id == company_id, User.is_active.is_(True)).order_by(User.id.desc()))
-    users = list(r.scalars().all())
+    # Studio Demo — только для /demo sandbox, не в рабочей команде клиента.
+    users = [
+        u
+        for u in r.scalars().all()
+        if (u.email or "").strip().lower() != "demo@sandbox.local"
+    ]
     if not users:
         return []
     user_ids = [int(u.id) for u in users]

@@ -454,6 +454,10 @@ async def seed_booking_defaults() -> None:
 
 
 LEAD_SOURCE_DEFAULTS = (
+    "Инстаграм",
+    "Фейсбук",
+    "Вотсап",
+    "Телеграм",
     "GREEN API",
     "WHATSAPP",
     "INSTAGRAM",
@@ -693,6 +697,12 @@ async def _run_startup_db_and_seed() -> None:
         await seed_lead_sources_defaults()
         await seed_sales_crm_space()
         await ensure_canonical_pipeline_stages()
+        try:
+            from app.services.purge_demo_artifacts import purge_demo_artifacts_from_client_companies
+
+            await purge_demo_artifacts_from_client_companies()
+        except Exception:
+            logger.exception("purge_demo_artifacts failed; continuing startup")
     except Exception as exc:
         logger.exception("startup seed/enum failed (API still starts): %s", exc)
 
