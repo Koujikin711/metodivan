@@ -24,10 +24,10 @@
     />
     <script>
       (function () {
-        /* Один раз перевести на светлую teal CRM-DN (старый dark был navy/indigo). */
-        if (!localStorage.getItem("mo-theme-crmdn-teal-v1")) {
+        /* CRM-DN: светлая teal по умолчанию (v2 сбрасывает залипший dark). */
+        if (!localStorage.getItem("mo-theme-crmdn-teal-v2")) {
           localStorage.setItem("mo-theme", "light");
-          localStorage.setItem("mo-theme-crmdn-teal-v1", "1");
+          localStorage.setItem("mo-theme-crmdn-teal-v2", "1");
         }
         var t = localStorage.getItem("mo-theme");
         if (t === "dark") document.documentElement.dataset.theme = "dark";

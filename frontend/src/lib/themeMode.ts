@@ -46,9 +46,10 @@ export function toggleTheme(): ThemeMode {
 
 /** Вызывать до первого рендера React, чтобы не мигал светлый фон. */
 export function initTheme() {
-  if (typeof window !== "undefined" && !localStorage.getItem("mo-theme-crmdn-teal-v1")) {
+  // v2: ещё раз принудительно светлая для CRM-DN (у кого остался dark после старого дефолта).
+  if (typeof window !== "undefined" && !localStorage.getItem("mo-theme-crmdn-teal-v2")) {
     localStorage.setItem(STORAGE_KEY, "light");
-    localStorage.setItem("mo-theme-crmdn-teal-v1", "1");
+    localStorage.setItem("mo-theme-crmdn-teal-v2", "1");
   }
   applyTheme(getStoredTheme());
 }
