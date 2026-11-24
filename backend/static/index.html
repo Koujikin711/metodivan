@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0c1222" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="MetodiOne" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/pwa-icon.svg" />
+    <link rel="icon" href="/pwa-icon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..700;1,14..32,400..700&display=swap"
+      rel="stylesheet"
+    />
+    <title>MetodiOne</title>
+    <meta
+      name="description"
+      content="MetodiOne CRM — воронка, KPI, запись, расходы и маркетинг."
+    />
+    <script>
+      (function () {
+        var t = localStorage.getItem("mo-theme");
+        if (t !== "dark" && t !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches) t = "dark";
+        if (t === "dark") document.documentElement.dataset.theme = "dark";
+        else document.documentElement.dataset.theme = "light";
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-UpjTzv-u.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BU4kcSXe.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

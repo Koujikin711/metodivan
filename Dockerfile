@@ -20,6 +20,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 COPY backend/ /app/
 COPY wa_bridge/index.js /app/wa_bridge/index.js
+RUN mkdir -p /app/data
 
 EXPOSE 8000
 

@@ -25,7 +25,8 @@ def _effective_database_url() -> str:
         # Validate early to fail with a clear error in logs.
         make_url(url)
         return url
-    return "sqlite+aiosqlite:///./crm.db"
+    # Amvera persistenceMount=/app/data — keep empty-instance DB across rebuilds.
+    return "sqlite+aiosqlite:////app/data/crm.db"
 
 
 def effective_database_url() -> str:

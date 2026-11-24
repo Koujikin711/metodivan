@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://metodi-one-koujikin.mia0.amvera.tech/api/:path*"
+    },
+    {
+      "source": "/((?!api/|reports/|assets/|landing/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -29,13 +29,7 @@ import { CrmPage } from "@/pages/CrmPage";
 import { FinancePage } from "@/pages/FinancePage";
 import { IntegrationsHubPage } from "@/pages/IntegrationsHubPage";
 import { KpiPage } from "@/pages/KpiPage";
-import { LandingPage } from "@/pages/LandingPage";
-import { DemoHubPage } from "@/pages/DemoHubPage";
-import { InvestorsPage } from "@/pages/InvestorsPage";
-import { IndustryPage } from "@/pages/IndustryPage";
-import { ShowcasePage } from "@/pages/ShowcasePage";
 import { DemoEnterPage } from "@/pages/DemoEnterPage";
-import { DemoBridgePage } from "@/pages/DemoBridgePage";
 import { OnboardingPage } from "@/pages/OnboardingPage";
 import { TasksPage } from "@/pages/TasksPage";
 import { TeamMessengerPage } from "@/pages/TeamMessengerPage";
@@ -69,7 +63,7 @@ export default function App() {
   return (
     <>
       <Routes>
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={<LoginPage />} />
         <Route path="/login" element={<LoginPage />} />
         {import.meta.env.DEV ? (
           <>
@@ -83,13 +77,13 @@ export default function App() {
             <Route path="/dev/ui/emr-chart" element={<DevEmrChartPreview />} />
           </>
         ) : null}
-        <Route path="/landing" element={<LandingPage />} />
-        <Route path="/demos" element={<DemoHubPage />} />
         <Route path="/demo" element={<DemoEnterPage />} />
-        <Route path="/enter/:productId" element={<DemoBridgePage />} />
-        <Route path="/investors" element={<InvestorsPage />} />
-        <Route path="/solutions/:slug" element={<IndustryPage />} />
-        <Route path="/showcase/:id" element={<ShowcasePage />} />
+        <Route path="/landing" element={<Navigate to="/" replace />} />
+        <Route path="/demos" element={<Navigate to="/" replace />} />
+        <Route path="/investors" element={<Navigate to="/" replace />} />
+        <Route path="/solutions/:slug" element={<Navigate to="/" replace />} />
+        <Route path="/showcase/:id" element={<Navigate to="/" replace />} />
+        <Route path="/enter/:productId" element={<Navigate to="/" replace />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/force-password" element={<ForcePasswordPage />} />
           <Route element={<MainLayout />}>

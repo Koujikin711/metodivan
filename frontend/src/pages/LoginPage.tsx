@@ -272,6 +272,23 @@ export function LoginPage() {
               {mutation.isPending ? "…" : mode === "login" ? "Войти" : "Зарегистрироваться"}
             </button>
           </form>
+          {mode === "login" ? (
+            <>
+              <button
+                type="button"
+                className="mt-3 w-full rounded-xl border border-[#d0dae6] bg-white px-4 py-3 text-sm font-semibold text-[#2f5f85] transition hover:bg-[#f3f6fa]"
+                onClick={() => {
+                  window.location.assign("/demo");
+                }}
+              >
+                Войти в демо (без пароля)
+              </button>
+              <p className="mt-3 text-center text-xs text-[#5c6b7a]">
+                Логин: <span className="font-mono">admin@crm.local</span> · пароль:{" "}
+                <span className="font-mono">admin</span>
+              </p>
+            </>
+          ) : null}
           <button
             type="button"
             className="mt-4 w-full text-center text-sm text-[var(--mo-text-muted)] underline-offset-2 hover:underline"

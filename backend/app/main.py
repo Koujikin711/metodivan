@@ -3,9 +3,12 @@ from contextlib import asynccontextmanager
 import logging
 import socket
 import time
+from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.responses import JSONResponse
 
 from app.core.request_id_middleware import RequestIdMiddleware
@@ -1124,14 +1127,9 @@ app.include_router(curator_journal.router, prefix="/api")
 app.include_router(emr.router, prefix="/api")
 
 
-@app.get("/")
-async def root():
-    """Amvera/envoy часто стучится в / — без ответа реплика остаётся 0/1."""
-    return {"status": "ok", "build": settings.build_version}
-
-
 @app.get("/health")
 async def health():
+    """Amvera/envoy health probe (UI живёт на / через SPA ниже)."""
     return {"status": "ok", "build": settings.build_version}
 
 
@@ -1209,3 +1207,28 @@ async def health_metrics():
             "db_pool": pool_status,
         }
     )
+
+
+# React SPA (Vite dist) — same Amvera container as API (metodivan / mebel-erp pattern).
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+
+if (STATIC_DIR / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def spa_fallback(full_path: str):
+    if full_path == "api" or full_path.startswith("api/"):
+        raise HTTPException(404, "Not Found")
+    if not STATIC_DIR.is_dir():
+        raise HTTPException(404, "Not Found")
+    candidate = (STATIC_DIR / full_path).resolve()
+    root = STATIC_DIR.resolve()
+    if root != candidate and root not in candidate.parents:
+        raise HTTPException(404, "Not Found")
+    if candidate.is_file():
+        return FileResponse(candidate)
+    index = STATIC_DIR / "index.html"
+    if index.is_file():
+        return FileResponse(index)
+    raise HTTPException(404, "Not Found")
