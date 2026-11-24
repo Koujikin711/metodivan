@@ -911,12 +911,15 @@ export function IntegrationSetupPanel() {
             <p className="lux-caption mt-1">Редактирование параметров, синхронизация таблиц и рассылки WhatsApp</p>
             <div className="mt-4 space-y-3">
               {integrationsQuery.isLoading && <p className="lux-body">Загрузка…</p>}
-              {(integrationsQuery.data ?? []).length === 0 && !integrationsQuery.isLoading && (
+              {(integrationsQuery.data ?? []).filter((it) => it.is_active).length === 0 &&
+                !integrationsQuery.isLoading && (
                 <p className="lux-body rounded-xl border border-dashed border-[var(--mo-border)] bg-[var(--mo-surface)] px-4 py-6 text-center">
                   Подключённых каналов пока нет. Выберите сервис выше, чтобы начать настройку.
                 </p>
               )}
-              {(integrationsQuery.data ?? []).map((it) => (
+              {(integrationsQuery.data ?? [])
+                .filter((it) => it.is_active)
+                .map((it) => (
                 <IntegrationCard
                   key={it.id}
                   it={it}
@@ -1430,10 +1433,13 @@ export function IntegrationSetupPanel() {
               <p className="mt-1 text-[11px] text-[var(--mo-text-muted)]">Webhook, синхронизация, изменение</p>
               <div className="mt-3 max-h-[min(520px,70vh)] space-y-2 overflow-y-auto">
                 {integrationsQuery.isLoading && <p className="text-sm text-[var(--mo-text-muted)]">Загрузка…</p>}
-                {(integrationsQuery.data ?? []).length === 0 && !integrationsQuery.isLoading && (
+                {(integrationsQuery.data ?? []).filter((it) => it.is_active).length === 0 &&
+                  !integrationsQuery.isLoading && (
                   <p className="text-sm text-[var(--mo-text-muted)]">Пока нет — выберите канал выше</p>
                 )}
-                {(integrationsQuery.data ?? []).map((it) => (
+                {(integrationsQuery.data ?? [])
+                  .filter((it) => it.is_active)
+                  .map((it) => (
                   <IntegrationCard
                     key={it.id}
                     it={it}
