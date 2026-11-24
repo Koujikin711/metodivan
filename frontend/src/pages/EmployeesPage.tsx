@@ -7,6 +7,7 @@ import { Pencil } from "@/components/icons";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { apiFetch, getStoredToken } from "@/lib/api";
 import { decodeUserIdFromToken } from "@/lib/auth";
+import { CRM_DN_DEFAULT_SPECIALTY, CRM_DN_SPECIALTY_SUGGESTIONS } from "@/lib/crmDnSpecialties";
 import type { Pipeline, UserRole } from "@/lib/types";
 
 export interface Employee {
@@ -173,7 +174,7 @@ export function EmployeesPage() {
   const [payrollOpen, setPayrollOpen] = useState(false);
   const [payrollName, setPayrollName] = useState("");
   const [payrollRole, setPayrollRole] = useState<UserRole>("expert");
-  const [payrollSpec, setPayrollSpec] = useState("Невролог");
+  const [payrollSpec, setPayrollSpec] = useState(CRM_DN_DEFAULT_SPECIALTY);
   const [payrollPhone, setPayrollPhone] = useState("");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -1197,7 +1198,7 @@ export function EmployeesPage() {
                         value={editSpecialization}
                         onChange={(ev) => setEditSpecialization(ev.target.value)}
                         className="mo-input"
-                        placeholder="Например: Невролог"
+                        placeholder="Например: Консультант"
                       />
                     </label>
                     <label className="employee-edit-check sm:col-span-2">
@@ -1303,13 +1304,9 @@ export function EmployeesPage() {
                     className="mo-input mt-1 w-full"
                   />
                   <datalist id="payroll-spec-list">
-                    <option value="Невролог" />
-                    <option value="Эндокринолог" />
-                    <option value="Невролог курса 15" />
-                    <option value="Массажист" />
-                    <option value="Логомассажист" />
-                    <option value="Остеопат" />
-                    <option value="Нутрициолог" />
+                    {CRM_DN_SPECIALTY_SUGGESTIONS.map((s) => (
+                      <option key={s} value={s} />
+                    ))}
                   </datalist>
                 </label>
               ) : null}

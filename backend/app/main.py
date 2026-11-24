@@ -447,7 +447,7 @@ async def seed_booking_defaults() -> None:
                 direction_id=d.id,
                 phone=None,
                 is_active=True,
-                specialization="Невролог",
+                specialization="Консультант",
             ),
         )
         await session.commit()

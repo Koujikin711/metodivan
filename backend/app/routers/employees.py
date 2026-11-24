@@ -683,7 +683,7 @@ async def invite_employee(
         if len(spec_s) < 2:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Укажите специальность эксперта (под ФИО в календаре записи, например Невролог)",
+                detail="Укажите специальность эксперта (под ФИО в календаре записи, например Консультант)",
             )
 
     email = body.email.strip().lower()

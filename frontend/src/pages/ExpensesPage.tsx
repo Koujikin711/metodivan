@@ -23,6 +23,7 @@ import { useSearchParams } from "react-router-dom";
 import { Check, GripVertical, Pencil } from "@/components/icons";
 import { apiFetch, getStoredToken } from "@/lib/api";
 import { decodeRoleFromToken } from "@/lib/auth";
+import { CRM_DN_DEFAULT_SPECIALTY, CRM_DN_SPECIALTY_SUGGESTIONS } from "@/lib/crmDnSpecialties";
 import { EXPENSE_CATALOG } from "@/lib/expenseCatalog";
 import { APP_CURRENCY } from "@/lib/money";
 import { DateField } from "@/components/DateField";
@@ -623,7 +624,7 @@ export function ExpensesPage() {
   const [payrollAddOpen, setPayrollAddOpen] = useState(false);
   const [payrollName, setPayrollName] = useState("");
   const [payrollRole, setPayrollRole] = useState("manager");
-  const [payrollSpec, setPayrollSpec] = useState("Невролог");
+  const [payrollSpec, setPayrollSpec] = useState(CRM_DN_DEFAULT_SPECIALTY);
   const [payrollPhone, setPayrollPhone] = useState("");
   const [pendingOpen, setPendingOpen] = useState(false);
   const [focusId, setFocusId] = useState<number | null>(() => {
@@ -1321,13 +1322,9 @@ export function ExpensesPage() {
                           list="payroll-sheet-specs"
                         />
                         <datalist id="payroll-sheet-specs">
-                          <option value="Невролог" />
-                          <option value="Эндокринолог" />
-                          <option value="Невролог курса 15" />
-                          <option value="Массажист" />
-                          <option value="Логомассажист" />
-                          <option value="Остеопат" />
-                          <option value="Нутрициолог" />
+                          {CRM_DN_SPECIALTY_SUGGESTIONS.map((s) => (
+                            <option key={s} value={s} />
+                          ))}
                         </datalist>
                       </label>
                     ) : null}
