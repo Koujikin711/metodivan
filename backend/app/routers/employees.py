@@ -993,7 +993,15 @@ async def patch_employee_contact(
         if old_role != new_role:
             changed = True
             target.role = new_role
-            if new_role not in (UserRole.admin, UserRole.administrator, UserRole.expert):
+            if new_role not in (
+                UserRole.owner,
+                UserRole.rop,
+                UserRole.manager,
+                UserRole.admin,
+                UserRole.administrator,
+                UserRole.expert,
+                UserRole.accountant,
+            ):
                 target.also_expert = False
             if new_role != UserRole.expert:
                 target.also_curator = False
@@ -1043,10 +1051,18 @@ async def patch_employee_contact(
             target.also_curator = bool(body.also_curator)
 
     if "also_expert" in body.model_fields_set and body.also_expert is not None:
-        if target.role not in (UserRole.admin, UserRole.administrator, UserRole.expert):
+        if target.role not in (
+            UserRole.owner,
+            UserRole.rop,
+            UserRole.manager,
+            UserRole.admin,
+            UserRole.administrator,
+            UserRole.expert,
+            UserRole.accountant,
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Окно эксперта на той же учётке доступно админу и эксперту",
+                detail="Вторая роль «Эксперт» недоступна для этой основной роли",
             )
         if bool(getattr(target, "also_expert", False)) != bool(body.also_expert):
             changed = True

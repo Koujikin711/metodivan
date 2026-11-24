@@ -102,6 +102,47 @@ function roleLabel(role: UserRole): string {
   return role;
 }
 
+const EDIT_ACCESS_ROLES: UserRole[] = [
+  "owner",
+  "manager",
+  "rop",
+  "expert",
+  "admin",
+  "administrator",
+  "curator",
+  "accountant",
+];
+
+const ROLE_PRIORITY: UserRole[] = [
+  "owner",
+  "rop",
+  "administrator",
+  "admin",
+  "manager",
+  "expert",
+  "curator",
+  "accountant",
+];
+
+function pickPrimaryRole(roles: UserRole[]): UserRole {
+  for (const r of ROLE_PRIORITY) {
+    if (roles.includes(r)) return r;
+  }
+  return roles[0] ?? "manager";
+}
+
+/** Можно ли добавить second к уже выбранной primary (макс. 2 роли). */
+function canPairAccessRoles(primary: UserRole, second: UserRole): boolean {
+  if (primary === second) return false;
+  if (second === "expert") return primary !== "expert";
+  if (second === "curator") return primary === "expert";
+  if (primary === "expert" && second !== "curator") {
+    // Эксперт как вторая роль к новой основной
+    return true;
+  }
+  return false;
+}
+
 export function EmployeesPage() {
   const qc = useQueryClient();
   const employeesQuery = useQuery({
@@ -154,6 +195,7 @@ export function EmployeesPage() {
   const [editPayoutBank, setEditPayoutBank] = useState("");
   const [editSpecialization, setEditSpecialization] = useState("");
   const [editAlsoExpert, setEditAlsoExpert] = useState(false);
+  const [editAlsoCurator, setEditAlsoCurator] = useState(false);
   const [editPipelineIds, setEditPipelineIds] = useState<number[]>([]);
   const [issuedLogin, setIssuedLogin] = useState<{
     email: string;
@@ -443,7 +485,67 @@ export function EmployeesPage() {
     setEditPayoutBank(e.payout_bank ?? "");
     setEditSpecialization(e.specialization ?? "");
     setEditAlsoExpert(Boolean(e.also_expert));
+    setEditAlsoCurator(Boolean(e.also_curator));
     setEditPipelineIds([...e.pipeline_ids]);
+  }
+
+  const editAccessRoles = useMemo(() => {
+    const roles: UserRole[] = [editRole];
+    if (editAlsoExpert && editRole !== "expert") roles.push("expert");
+    if (editAlsoCurator && editRole === "expert") roles.push("curator");
+    return roles;
+  }, [editRole, editAlsoExpert, editAlsoCurator]);
+
+  function applyEditAccessRoles(nextRoles: UserRole[]) {
+    if (nextRoles.length === 0) return;
+    const primary = pickPrimaryRole(nextRoles);
+    setEditRole(primary);
+    if (primary === "expert") {
+      setEditAlsoCurator(nextRoles.includes("curator"));
+      // also_expert for expert = «окно эксперта», не трогаем здесь
+    } else {
+      setEditAlsoExpert(nextRoles.includes("expert"));
+      setEditAlsoCurator(false);
+    }
+  }
+
+  function toggleEditAccessRole(role: UserRole) {
+    const selected = editAccessRoles;
+    if (selected.includes(role)) {
+      const next = selected.filter((r) => r !== role);
+      if (next.length === 0) {
+        toast.error("Нужна хотя бы одна роль");
+        return;
+      }
+      applyEditAccessRoles(next);
+      return;
+    }
+    if (selected.length >= 2) {
+      toast.error("Можно выбрать только 2 роли — снимите одну");
+      return;
+    }
+    if (selected.length === 1) {
+      const primary = selected[0]!;
+      if (role === "expert" && primary !== "expert") {
+        applyEditAccessRoles([primary, "expert"]);
+        return;
+      }
+      if (role === "curator" && primary === "expert") {
+        applyEditAccessRoles(["expert", "curator"]);
+        return;
+      }
+      if (primary === "expert" && role !== "curator") {
+        applyEditAccessRoles([role, "expert"]);
+        return;
+      }
+      if (!canPairAccessRoles(primary, role)) {
+        toast.error("Вторая роль: Эксперт (или Куратор вместе с Экспертом)");
+        return;
+      }
+      applyEditAccessRoles([primary, role]);
+      return;
+    }
+    applyEditAccessRoles([role]);
   }
 
   function toggleEditPipeline(id: number) {
@@ -483,9 +585,8 @@ export function EmployeesPage() {
       const specChanged =
         editRole === "expert" &&
         editSpecialization.trim() !== (editEmployee.specialization || "").trim();
-      const alsoExpertChanged =
-        (editRole === "admin" || editRole === "administrator" || editRole === "expert") &&
-        editAlsoExpert !== Boolean(editEmployee.also_expert);
+      const alsoExpertChanged = editAlsoExpert !== Boolean(editEmployee.also_expert);
+      const alsoCuratorChanged = editAlsoCurator !== Boolean(editEmployee.also_curator);
       const pipelinesChanged =
         canEditPipelines(editRole) &&
         (editPipelineIds.length !== editEmployee.pipeline_ids.length ||
@@ -506,7 +607,8 @@ export function EmployeesPage() {
         specChanged ||
         salaryChanged ||
         bankChanged ||
-        alsoExpertChanged;
+        alsoExpertChanged ||
+        alsoCuratorChanged;
 
       if (!profileChanged && !pipelinesChanged) {
         throw new Error("Нет изменений");
@@ -519,15 +621,12 @@ export function EmployeesPage() {
           phone: editPhone.trim(),
           full_name: editFullName.trim(),
           ...(roleChanged ? { role: editRole } : {}),
-          ...(editRole === "expert"
-            ? {
-                specialization: editSpecialization.trim(),
-                also_expert: editAlsoExpert,
-              }
+          ...(editRole === "expert" ? { specialization: editSpecialization.trim() } : {}),
+          ...(alsoExpertChanged || roleChanged ? { also_expert: editAlsoExpert } : {}),
+          ...(editRole === "expert" && (alsoCuratorChanged || roleChanged)
+            ? { also_curator: editAlsoCurator }
             : {}),
-          ...(editRole === "admin" || editRole === "administrator"
-            ? { also_expert: editAlsoExpert }
-            : {}),
+          ...(roleChanged && editRole !== "expert" ? { also_curator: false } : {}),
           base_salary: editSalary.trim() ? Number(editSalary) : null,
           payout_bank: editPayoutBank.trim() || null,
         });
@@ -953,10 +1052,11 @@ export function EmployeesPage() {
               <div>
                 <h2 className="lux-subheading">Редактировать сотрудника</h2>
                 <p className="mt-1 text-xs lux-caption">
-                  <span className="employee-role-badge">{roleLabel(editRole)}</span>
-                  {(editRole === "admin" || editRole === "administrator") && editAlsoExpert ? (
-                    <span className="employee-role-badge">Эксперт</span>
-                  ) : null}
+                  {editAccessRoles.map((r) => (
+                    <span key={r} className="employee-role-badge">
+                      {roleLabel(r)}
+                    </span>
+                  ))}
                 </p>
               </div>
               <button type="button" onClick={() => setEditEmployee(null)} className="mo-modal-close">
@@ -976,30 +1076,36 @@ export function EmployeesPage() {
                     placeholder="Фамилия Имя"
                   />
                 </label>
-                <label className="employee-edit-field mt-3">
+                <div className="employee-edit-field mt-3">
                   <span>Уровень доступа</span>
-                  <select
-                    value={editRole}
-                    onChange={(ev) => {
-                      const next = ev.target.value as UserRole;
-                      setEditRole(next);
-                      if (next !== "expert" && next !== "admin" && next !== "administrator") {
-                        setEditAlsoExpert(false);
-                      }
-                    }}
-                    className="mo-input"
-                    disabled={editEmployee.role === "owner" && editEmployee.id === myUserId}
+                  <p className="mt-1 text-[11px] mo-muted">До двух ролей. Вторая — Эксперт (или Куратор с Экспертом).</p>
+                  <div
+                    className="mt-2 grid gap-2 sm:grid-cols-2"
+                    role="group"
+                    aria-label="Уровень доступа"
                   >
-                    <option value="owner">Владелец</option>
-                    <option value="manager">Менеджер</option>
-                    <option value="rop">РОП</option>
-                    <option value="expert">Эксперт</option>
-                    <option value="admin">Админ воронки</option>
-                    <option value="administrator">Администратор</option>
-                    <option value="curator">Куратор</option>
-                    <option value="accountant">Бухгалтер</option>
-                  </select>
-                </label>
+                    {EDIT_ACCESS_ROLES.map((r) => {
+                      const lockedOwner =
+                        editEmployee.role === "owner" &&
+                        editEmployee.id === myUserId &&
+                        r === "owner";
+                      return (
+                        <label key={r} className="employee-edit-check">
+                          <input
+                            type="checkbox"
+                            checked={editAccessRoles.includes(r)}
+                            disabled={
+                              (editEmployee.role === "owner" && editEmployee.id === myUserId) ||
+                              lockedOwner
+                            }
+                            onChange={() => toggleEditAccessRole(r)}
+                          />
+                          <span>{roleLabel(r)}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
                 {editEmployee.role === "owner" && editEmployee.id === myUserId ? (
                   <p className="mt-1 text-[11px] mo-muted">Свою роль владельца здесь сменить нельзя.</p>
                 ) : null}
@@ -1092,20 +1198,6 @@ export function EmployeesPage() {
                 </button>
               </section>
 
-              {editRole === "admin" || editRole === "administrator" ? (
-                <section className="employee-edit-section">
-                  <h3 className="employee-edit-section__title">Окно эксперта</h3>
-                  <label className="employee-edit-check">
-                    <input
-                      type="checkbox"
-                      checked={editAlsoExpert}
-                      onChange={(ev) => setEditAlsoExpert(ev.target.checked)}
-                    />
-                    <span>Ещё эксперт — тот же вход, в меню пункт «Окно эксперта»</span>
-                  </label>
-                </section>
-              ) : null}
-
               {editRole === "expert" ? (
                 <section className="employee-edit-section">
                   <h3 className="employee-edit-section__title">Онлайн-запись</h3>
@@ -1125,7 +1217,7 @@ export function EmployeesPage() {
                         checked={editAlsoExpert}
                         onChange={(ev) => setEditAlsoExpert(ev.target.checked)}
                       />
-                      <span>Ещё эксперт — тот же вход, в меню пункт «Окно эксперта»</span>
+                      <span>Окно эксперта — тот же вход, пункт в меню</span>
                     </label>
                   </div>
                 </section>

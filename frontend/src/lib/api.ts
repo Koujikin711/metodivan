@@ -104,7 +104,7 @@ function isTransientGateway(status: number, text: string, contentType: string | 
 }
 
 function gatewayUserMessage(status: number): string {
-  return `Сервер клиники временно недоступен (${status}). Подождите несколько секунд и повторите.`;
+  return `Сервер временно недоступен (${status}). Подождите несколько секунд и повторите.`;
 }
 
 export async function apiFetch<T>(path: string, init: ApiFetchInit = {}): Promise<T> {

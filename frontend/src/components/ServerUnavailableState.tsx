@@ -29,7 +29,7 @@ export function ServerUnavailableState({ message, onRetry }: Props) {
           />
       </div>
       <p className="server-down__eyebrow">503 · нет связи</p>
-      <h2 className="server-down__title">Сервер клиники сейчас отдыхает</h2>
+      <h2 className="server-down__title">Сервер не работает!</h2>
       <p className="server-down__text">
         {message?.trim() ||
           "Связь с API временно пропала. Подождите немного и обновите — обычно это проходит само."}
@@ -45,6 +45,7 @@ export function isServerUnavailableError(error: unknown): boolean {
   const msg = error instanceof Error ? error.message : String(error ?? "");
   return (
     /временно недоступен\s*\(50[234]\)/i.test(msg) ||
+    /Сервер не работает/i.test(msg) ||
     /Сервер не ответил за \d+ с/i.test(msg) ||
     /Нет связи с (сервером|API)/i.test(msg)
   );
