@@ -358,7 +358,7 @@ function SortableSpecialistColumn({
       </div>
 
       <div
-        className={`relative ${isDragging ? "opacity-90 ring-2 ring-indigo-500/40" : ""}`}
+        className={`relative ${isDragging ? "opacity-90 ring-2 ring-[var(--mo-accent)]/40" : ""}`}
         style={{ height: gridHeightPx }}
       >
         {"fullDay" in hatch && hatch.fullDay ? (
@@ -444,7 +444,7 @@ function SortableSpecialistColumn({
                     })
                   }
                   {...dragHandlers}
-                  className="absolute inset-x-1 z-[5] cursor-pointer rounded-md border border-transparent transition-colors hover:border-indigo-500/35 hover:bg-indigo-500/10"
+                  className="absolute inset-x-1 z-[5] cursor-pointer rounded-md border border-transparent transition-colors hover:border-[var(--mo-accent)]/35 hover:bg-[var(--mo-accent)]/10"
                   style={slotStyle}
                   aria-label={`Свободный слот ${minuteLabel}, ${spec.full_name}`}
                 />,
@@ -462,7 +462,7 @@ function SortableSpecialistColumn({
                         minuteOfDay,
                       });
                     }}
-                    className="absolute right-0.5 z-30 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[11px] font-bold leading-none text-white shadow"
+                    className="absolute right-0.5 z-30 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--mo-accent)] text-[11px] font-bold leading-none text-white shadow"
                     style={{ top: `calc(${topPct}% + 1px)` }}
                     title={`Ещё запись в этот час (${hourCount} из ${MAX_BOOKINGS_PER_SPECIALIST_HOUR})`}
                     aria-label={`Ещё запись ${minuteLabel}, ${spec.full_name}`}

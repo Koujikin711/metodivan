@@ -71,6 +71,27 @@ const CRM_DN_SOURCE_HIDDEN = new Set(
   ].map((n) => n.trim().toLowerCase()),
 );
 
+/** На карточках канбана показываем единые кириллические ярлыки. */
+function formatLeadSourceLabel(raw: string): string {
+  const key = raw.trim().toLowerCase();
+  const map: Record<string, string> = {
+    "green api": "Вотсап",
+    green_api: "Вотсап",
+    greenapi: "Вотсап",
+    whatsapp: "Вотсап",
+    wa: "Вотсап",
+    instagram: "Инстаграм",
+    "instagram_dm": "Инстаграм",
+    "instagram mc": "Инстаграм",
+    "instagram dm": "Инстаграм",
+    facebook: "Фейсбук",
+    fb: "Фейсбук",
+    telegram: "Телеграм",
+    tg: "Телеграм",
+  };
+  return map[key] ?? raw.trim();
+}
+
 function stageDroppableId(stageId: number) {
   return `stage-${stageId}`;
 }
@@ -82,9 +103,9 @@ function leadDraggableId(leadId: number) {
 /** Совпадает с бэкендом `default_pipeline_stages` (клиника). Sales — 6 чат-стадий. */
 const DEFAULT_CLINIC_PIPELINE_STAGES: Array<{ name: string; color: string }> = [
   { name: "Новый", color: "#64748b" },
-  { name: "Квалифицирован", color: "#6366f1" },
-  { name: "Запись", color: "#8b5cf6" },
-  { name: "У эксперта", color: "#0ea5e9" },
+  { name: "Квалифицирован", color: "#0f766e" },
+  { name: "Запись", color: "#0ea5e9" },
+  { name: "У эксперта", color: "#0284c7" },
   { name: "Оказание услуги", color: "#14b8a6" },
   { name: "Доп. услуги", color: "#f59e0b" },
   { name: "Оплачено", color: "#22c55e" },
@@ -237,7 +258,7 @@ function LeadCardBody({
           </div>
           {lead.source ? (
             <p className="mt-1 truncate text-[11px] text-[var(--mo-text-muted)]" title="Источник">
-              {lead.source}
+              {formatLeadSourceLabel(lead.source)}
             </p>
           ) : null}
         </div>
@@ -959,7 +980,7 @@ export function CrmPage() {
   const [createPipelineOpen, setCreatePipelineOpen] = useState(false);
   const [createStageOpen, setCreateStageOpen] = useState(false);
   const [newStageName, setNewStageName] = useState("");
-  const [newStageColor, setNewStageColor] = useState("#6366f1");
+  const [newStageColor, setNewStageColor] = useState("#0f766e");
   const [newStageAutoMode, setNewStageAutoMode] = useState<"off" | "task">("off");
   const [newStageTaskTitle, setNewStageTaskTitle] = useState("");
   const [stageEditorId, setStageEditorId] = useState<number | null>(null);
@@ -994,7 +1015,7 @@ export function CrmPage() {
             ? pipeStages.map((s, idx) => ({
                 name: s.name.trim(),
                 order: idx,
-                color: s.color || "#6366f1",
+                color: s.color || "#0f766e",
               }))
             : [],
         }),
@@ -1035,7 +1056,7 @@ export function CrmPage() {
       toast.success("Стадия создана");
       setCreateStageOpen(false);
       setNewStageName("");
-      setNewStageColor("#6366f1");
+      setNewStageColor("#0f766e");
       setNewStageAutoMode("off");
       setNewStageTaskTitle("");
       void queryClient.invalidateQueries({ queryKey: ["stages", pipelineId] });
@@ -1738,15 +1759,15 @@ export function CrmPage() {
         void queryClient.invalidateQueries({ queryKey: ["leads-stage-counts"] });
         toast.success("Статус обновлен!");
         if (data.automation_task_created) {
-          toast.success("🤖 Робот: Создана новая задача для менеджера", {
+          toast.success("Робот: создана задача для менеджера", {
             duration: 5000,
             style: {
-              background: "linear-gradient(135deg, #0f172a 0%, #312e81 45%, #5b21b6 100%)",
-              color: "#e2e8f0",
+              background: "linear-gradient(135deg, #0c1a18 0%, #0f766e 55%, #14b8a6 100%)",
+              color: "#eef7f4",
               padding: "14px 18px",
               borderRadius: "14px",
-              boxShadow: "0 18px 40px -12px rgba(91, 33, 182, 0.5)",
-              border: "1px solid rgba(167, 139, 250, 0.25)",
+              boxShadow: "0 18px 40px -12px rgba(15, 118, 110, 0.45)",
+              border: "1px solid rgba(45, 212, 191, 0.28)",
             },
           });
         }
@@ -2532,7 +2553,7 @@ export function CrmPage() {
                     <button
                       type="button"
                       onClick={() =>
-                        setPipeStages((prev) => [...prev, { name: "", color: "#6366f1" }])
+                        setPipeStages((prev) => [...prev, { name: "", color: "#0f766e" }])
                       }
                       className="rounded-full border border-[var(--mo-border)] px-3 py-1 text-sm text-[var(--mo-text)] hover:bg-[var(--mo-accent-soft)]"
                     >

@@ -374,7 +374,7 @@ export function TasksPage() {
                       className={[
                         "h-9 min-w-9 rounded-lg border px-2 text-xs font-medium transition",
                         on
-                          ? "border-indigo-500/50 bg-[var(--mo-accent-soft)] text-[var(--mo-accent-hover)]"
+                          ? "border-[var(--mo-accent)]/50 bg-[var(--mo-accent-soft)] text-[var(--mo-accent-hover)]"
                           : "border-[var(--mo-border)] bg-transparent lux-caption",
                       ].join(" ")}
                     >

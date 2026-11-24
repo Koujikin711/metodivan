@@ -14,7 +14,7 @@ import {
   YAxis,
 } from "recharts";
 
-const COLORS = ["#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#14b8a6", "#f97316", "#6366f1"];
+const COLORS = ["#0ea5e9", "#10b981", "#f59e0b", "#0f766e", "#ef4444", "#14b8a6", "#f97316", "#0284c7"];
 
 const tick = { fill: "var(--mo-text-muted, #64748b)", fontSize: 11 };
 

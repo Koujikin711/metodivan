@@ -2533,7 +2533,7 @@ export function OnlineBookingPage() {
                   >
                     <td className="whitespace-nowrap tabular-nums">
                       {showSessionInsteadOfTime ? (
-                        <span className="font-semibold text-indigo-800">{visitDisplayValue(a) ?? "—"}</span>
+                        <span className="font-semibold text-[var(--mo-accent-hover)]">{visitDisplayValue(a) ?? "—"}</span>
                       ) : (
                         formatDt(a.start_at)
                       )}

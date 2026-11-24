@@ -1250,7 +1250,7 @@ export function LeadDetailPage() {
                   moveMinuteOfDay == null
                 }
                 onClick={handleMoveAppointmentSubmit}
-                className="rounded-xl bg-indigo-600 px-4 py-2 lux-subheading text-sm hover:bg-indigo-500 disabled:opacity-50"
+                className="rounded-xl bg-[var(--mo-accent)] px-4 py-2 lux-subheading text-sm text-white hover:bg-[var(--mo-accent-hover)] disabled:opacity-50"
               >
                 {moveAppointmentMutation.isPending ? "Перенос..." : "Перенести"}
               </button>

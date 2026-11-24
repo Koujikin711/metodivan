@@ -154,7 +154,7 @@ export function ExpertReportsPage() {
                     <td className="py-2 pr-4 tabular-nums font-medium text-emerald-800">
                       {x.first_visit_patients ?? 0}
                     </td>
-                    <td className="py-2 pr-4 tabular-nums font-medium text-indigo-800">
+                    <td className="py-2 pr-4 tabular-nums font-medium text-[var(--mo-accent-hover)]">
                       {x.repeat_patients ?? 0}
                     </td>
                     <td className="py-2 pr-4 tabular-nums font-semibold">{x.sessions_total ?? 0}</td>

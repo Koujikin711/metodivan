@@ -380,7 +380,7 @@ export function CompaniesPage() {
               }
               platformBillingMutation.mutate(n);
             }}
-            className="rounded-xl bg-indigo-600 px-4 py-2 lux-subheading text-sm hover:bg-indigo-500 disabled:opacity-50"
+            className="rounded-xl bg-[var(--mo-accent)] px-4 py-2 lux-subheading text-sm text-white hover:bg-[var(--mo-accent-hover)] disabled:opacity-50"
           >
             Сохранить срок демо
           </button>
@@ -407,7 +407,7 @@ export function CompaniesPage() {
                       {row.name} <span className="mo-muted">#{row.id}</span>
                     </td>
                     <td className="px-3 py-2">{row.contact_email ?? "—"}</td>
-                    <td className="px-3 py-2 text-violet-200">{row.pending_tariff_plan_name ?? "—"}</td>
+                    <td className="px-3 py-2 text-[var(--mo-accent-hover)]">{row.pending_tariff_plan_name ?? "—"}</td>
                     <td className="px-3 py-2 text-right">
                       <button
                         type="button"
@@ -566,7 +566,7 @@ export function CompaniesPage() {
             <p className="mt-1 text-xs lux-caption">
               Пользователи: {c.users_count} · Лиды: {c.leads_count} · Воронки: {c.pipelines_count}
             </p>
-            <p className="mt-2 text-xs text-violet-200/90">
+            <p className="mt-2 text-xs text-[var(--mo-text-muted)]">
               Тарифный план: {c.tariff_plan_name ?? "не назначен (все функции)"}
             </p>
             <p className="mt-1 text-xs mo-muted">
@@ -726,7 +726,7 @@ export function CompaniesPage() {
                   }
                   tariffMutation.mutate({ companyId: tariffCompany.id, body });
                 }}
-                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-[var(--mo-text)] hover:bg-indigo-500 disabled:opacity-50"
+                className="rounded-xl bg-[var(--mo-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--mo-accent-hover)] disabled:opacity-50"
               >
                 Сохранить
               </button>
@@ -759,7 +759,7 @@ export function CompaniesPage() {
                   }
                   billingDiscountMutation.mutate({ companyId: tariffCompany.id, percent: n });
                 }}
-                className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-[var(--mo-text)] hover:bg-violet-500 disabled:opacity-50"
+                className="rounded-xl bg-[var(--mo-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--mo-accent-hover)] disabled:opacity-50"
               >
                 Сохранить скидку
               </button>

@@ -378,7 +378,7 @@ export function AttendanceTrackerPage() {
                   }
                   void createFenceMutation.mutateAsync();
                 }}
-                className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium hover:bg-indigo-500"
+                className="rounded-lg bg-[var(--mo-accent)] px-3 py-2 text-sm font-medium text-white hover:bg-[var(--mo-accent-hover)]"
               >
                 Добавить геозону
               </button>

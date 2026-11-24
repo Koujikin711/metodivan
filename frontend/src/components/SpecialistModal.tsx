@@ -376,7 +376,7 @@ export function SpecialistModal({
                   className={[
                     "h-9 rounded-lg border text-xs font-medium transition",
                     workWeekdays.includes(d)
-                      ? "border-indigo-500/50 bg-[var(--mo-accent-soft)] text-[var(--mo-accent-hover)]"
+                      ? "border-[var(--mo-accent)]/50 bg-[var(--mo-accent-soft)] text-[var(--mo-accent-hover)]"
                       : "border-[var(--mo-border)] bg-transparent mo-muted",
                   ].join(" ")}
                 >
@@ -403,7 +403,7 @@ export function SpecialistModal({
                     className={[
                       "flex h-9 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-medium transition",
                       selected
-                        ? "border-indigo-500/50 bg-[var(--mo-accent-soft)] text-[var(--mo-text)]"
+                        ? "border-[var(--mo-accent)]/50 bg-[var(--mo-accent-soft)] text-[var(--mo-text)]"
                         : "border-[var(--mo-border)] bg-transparent mo-muted",
                     ].join(" ")}
                     title={isPrimary ? "Основная услуга" : selected ? "Нажмите, чтобы снять" : "Добавить"}

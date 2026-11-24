@@ -196,7 +196,7 @@ function PlanEditorModal({
             type="button"
             disabled={isPending}
             onClick={() => submit()}
-            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-[var(--mo-text)] hover:bg-indigo-500 disabled:opacity-50"
+            className="rounded-xl bg-[var(--mo-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--mo-accent-hover)] disabled:opacity-50"
           >
             {isPending ? "Сохранение…" : "Сохранить"}
           </button>
@@ -508,7 +508,7 @@ function PricingCatalogSection({ catalog }: { catalog: FeatureCatalogItem[] }) {
             type="button"
             disabled={saveMut.isPending}
             onClick={() => saveMut.mutate(buildPayload())}
-            className="mt-3 rounded-xl bg-indigo-600 px-4 py-2 lux-subheading text-sm hover:bg-indigo-500 disabled:opacity-50"
+            className="mt-3 rounded-xl bg-[var(--mo-accent)] px-4 py-2 lux-subheading text-sm text-white hover:bg-[var(--mo-accent-hover)] disabled:opacity-50"
           >
             {saveMut.isPending ? "Сохранение…" : "Сохранить каталог цен"}
           </button>
