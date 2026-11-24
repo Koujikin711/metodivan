@@ -126,7 +126,7 @@ export function MarketingPage() {
   const [period, setPeriod] = useState<PeriodKind>("month");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [adAccountId, setAdAccountId] = useState("act_1442491974027857");
+  const [adAccountId, setAdAccountId] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [showConnect, setShowConnect] = useState(false);
   const [igAccount, setIgAccount] = useState<string | null>(null);
@@ -352,7 +352,7 @@ export function MarketingPage() {
                 className="mo-input mt-1 w-full"
                 value={adAccountId}
                 onChange={(e) => setAdAccountId(e.target.value)}
-                placeholder="act_1442491974027857"
+                placeholder="act_…"
                 autoComplete="off"
               />
             </label>
