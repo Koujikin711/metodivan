@@ -5,11 +5,11 @@ import toast from "react-hot-toast";
 import { apiFetch } from "@/lib/api";
 import type { BookingDirection } from "@/lib/types";
 
-/** CRM-DN услуги записи (вместо клинических «потоков курсов»). */
+/** CRM-DN продукты записи (вместо клинических «потоков курсов»). */
 export const CRM_DN_DEFAULT_PRODUCTS = [
+  { name: "Консультация", duration_min: 60 },
   { name: "Интенсив", duration_min: 60 },
   { name: "Курс «Мисли Дилноза»", duration_min: 60 },
-  { name: "Консультация", duration_min: 60 },
 ] as const;
 
 export function DirectionStreamsPanel() {
@@ -17,6 +17,7 @@ export function DirectionStreamsPanel() {
   const [pipelineId, setPipelineId] = useState<number | "">("");
   const [newName, setNewName] = useState("");
   const [newDuration, setNewDuration] = useState(60);
+  const [autoSeededFor, setAutoSeededFor] = useState<number | null>(null);
 
   const pipelinesQ = useQuery({
     queryKey: ["pipelines"],
@@ -40,11 +41,52 @@ export function DirectionStreamsPanel() {
     void qc.invalidateQueries({ queryKey: ["booking-directions-all"] });
   }
 
+  /** Подтянуть базовые продукты (в т.ч. Консультация), если их ещё нет. */
+  useEffect(() => {
+    if (pipelineId === "" || directionsQ.isLoading || !directionsQ.isSuccess) return;
+    if (autoSeededFor === pipelineId) return;
+    const existing = new Set(
+      (directionsQ.data ?? []).filter((d) => d.is_active).map((d) => d.name.trim().toLowerCase()),
+    );
+    const missing = CRM_DN_DEFAULT_PRODUCTS.filter((p) => !existing.has(p.name.toLowerCase()));
+    if (!missing.length) {
+      setAutoSeededFor(pipelineId);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        for (const p of missing) {
+          if (cancelled) return;
+          await apiFetch<BookingDirection>("/api/booking/directions", {
+            method: "POST",
+            body: JSON.stringify({
+              name: p.name,
+              duration_min: p.duration_min,
+              pipeline_id: pipelineId,
+            }),
+          });
+        }
+        if (!cancelled) {
+          setAutoSeededFor(pipelineId);
+          invalidate();
+        }
+      } catch {
+        /* ручное добавление всё ещё доступно */
+        if (!cancelled) setAutoSeededFor(pipelineId);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipelineId, directionsQ.isLoading, directionsQ.isSuccess, directionsQ.data, autoSeededFor]);
+
   const createMut = useMutation({
     mutationFn: (body: { name: string; duration_min: number }) => {
       if (pipelineId === "") throw new Error("Выберите воронку");
       const name = body.name.trim();
-      if (!name) throw new Error("Укажите название услуги");
+      if (!name) throw new Error("Укажите название продукта");
       const duration = Math.min(480, Math.max(10, Number(body.duration_min) || 60));
       return apiFetch<BookingDirection>("/api/booking/directions", {
         method: "POST",
@@ -56,12 +98,12 @@ export function DirectionStreamsPanel() {
       });
     },
     onSuccess: (row) => {
-      toast.success(`Услуга «${row.name}» добавлена`);
+      toast.success(`Продукт «${row.name}» добавлен`);
       setNewName("");
       setNewDuration(60);
       invalidate();
     },
-    onError: (e: Error) => toast.error(e.message || "Не удалось добавить услугу"),
+    onError: (e: Error) => toast.error(e.message || "Не удалось добавить продукт"),
   });
 
   const seedMut = useMutation({
@@ -86,18 +128,18 @@ export function DirectionStreamsPanel() {
       return created;
     },
     onSuccess: (n) => {
-      if (n === 0) toast.success("Базовые услуги уже есть");
-      else toast.success(`Добавлено услуг: ${n}`);
+      if (n === 0) toast.success("Базовые продукты уже есть");
+      else toast.success(`Добавлено продуктов: ${n}`);
       invalidate();
     },
-    onError: (e: Error) => toast.error(e.message || "Не удалось добавить услуги"),
+    onError: (e: Error) => toast.error(e.message || "Не удалось добавить продукты"),
   });
 
   const archiveMut = useMutation({
     mutationFn: (id: number) =>
       apiFetch<void>(`/api/booking/directions/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Услуга скрыта");
+      toast.success("Продукт скрыт");
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message || "Не удалось скрыть"),
@@ -114,11 +156,12 @@ export function DirectionStreamsPanel() {
     <section className="mo-section space-y-3 p-3 sm:p-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div className="min-w-0 max-w-2xl">
-          <h2 className="text-sm font-semibold text-[var(--mo-text)] sm:text-base">Услуги</h2>
+          <h2 className="text-sm font-semibold text-[var(--mo-text)] sm:text-base">Продукты</h2>
           <p className="mt-0.5 text-[11px] leading-snug mo-muted">
-            Список для онлайн-записи. Можно добавить своё название вручную или взять базовые:{" "}
+            Базовые: <b className="text-[var(--mo-text)]">Консультация</b>,{" "}
             <b className="text-[var(--mo-text)]">Интенсив</b>,{" "}
-            <b className="text-[var(--mo-text)]">Курс «Мисли Дилноза»</b>, консультация.
+            <b className="text-[var(--mo-text)]">Курс «Мисли Дилноза»</b>. Своё название — вручную
+            ниже.
           </p>
         </div>
         <label className="flex items-center gap-2 text-[11px] mo-muted">
@@ -139,9 +182,9 @@ export function DirectionStreamsPanel() {
       </div>
 
       <div className="rounded-xl border border-[var(--mo-accent)]/25 bg-[var(--mo-accent-soft)]/40 p-3">
-        <p className="text-xs font-semibold text-[var(--mo-text)]">Добавить услугу вручную</p>
+        <p className="text-xs font-semibold text-[var(--mo-text)]">Добавить продукт вручную</p>
         <p className="mt-0.5 text-[11px] mo-muted">
-          Введите любое название — оно сразу появится в выборе услуги при записи.
+          Введите любое название — оно сразу появится в выборе при записи.
         </p>
         <div className="mt-2 flex flex-wrap items-end gap-2">
           <label className="min-w-[14rem] flex-1 text-[11px] mo-muted">
@@ -156,7 +199,7 @@ export function DirectionStreamsPanel() {
                   if (canSubmit) submitManual();
                 }
               }}
-              placeholder="Например: Интенсив или своя услуга"
+              placeholder="Например: Консультация"
               autoComplete="off"
             />
           </label>
@@ -186,7 +229,7 @@ export function DirectionStreamsPanel() {
             disabled={pipelineId === "" || seedMut.isPending}
             onClick={() => seedMut.mutate()}
           >
-            {seedMut.isPending ? "…" : "Базовые услуги"}
+            {seedMut.isPending ? "…" : "Базовые продукты"}
           </button>
         </div>
       </div>
@@ -195,12 +238,12 @@ export function DirectionStreamsPanel() {
 
       {!directionsQ.isLoading && products.length === 0 && pipelineId !== "" && (
         <p className="text-sm mo-muted">
-          Пока пусто. Введите название выше и нажмите «Добавить», либо «Базовые услуги».
+          Пока пусто — базовые продукты подтянутся сами, либо добавьте название вручную.
         </p>
       )}
 
       {pipelineId === "" && (
-        <p className="text-sm mo-muted">Сначала выберите воронку — затем можно добавить услугу.</p>
+        <p className="text-sm mo-muted">Сначала выберите воронку — затем можно добавить продукт.</p>
       )}
 
       {products.length > 0 ? (
@@ -219,7 +262,7 @@ export function DirectionStreamsPanel() {
                 className="text-xs font-medium text-rose-600 hover:underline disabled:opacity-50"
                 disabled={archiveMut.isPending}
                 onClick={() => {
-                  if (!window.confirm(`Скрыть услугу «${d.name}»?`)) return;
+                  if (!window.confirm(`Скрыть продукт «${d.name}»?`)) return;
                   archiveMut.mutate(d.id);
                 }}
               >
