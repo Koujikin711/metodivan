@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 
+import { apiFetch } from "@/lib/api";
 import { isAdminOnlyBookingDirectionName } from "@/lib/bookingDirectionKinds";
-import type { BookingSpecialist } from "@/lib/types";
+import type { BookingDirection, BookingSpecialist, Pipeline } from "@/lib/types";
 
 const GRID_START = 7;
 const GRID_END = 20;
@@ -48,6 +50,10 @@ type Props = {
   onClose: () => void;
   onSubmit: (values: SpecialistFormValues) => void;
   onDelete?: () => void;
+  /** После создания направления (чтобы обновить список снаружи) */
+  onDirectionsChanged?: () => void;
+  /** Открыть панель «Направления записи» */
+  onOpenDirectionsPanel?: () => void;
 };
 
 function normWeekdays(raw: number[] | undefined): number[] {
@@ -83,6 +89,8 @@ export function SpecialistModal({
   onClose,
   onSubmit,
   onDelete,
+  onDirectionsChanged,
+  onOpenDirectionsPanel,
 }: Props) {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -96,6 +104,7 @@ export function SpecialistModal({
   const [courseStreamMaxDays, setCourseStreamMaxDays] = useState(15);
   const [courseStreamMinDay, setCourseStreamMinDay] = useState(10);
   const [courseStreamGapDays, setCourseStreamGapDays] = useState(10);
+  const [creatingDirection, setCreatingDirection] = useState(false);
 
   const visibleDirections = useMemo(
     () =>
@@ -187,14 +196,47 @@ export function SpecialistModal({
     visibleDirections.some((d) => d.id === initial.direction_id && !d.is_active) &&
     !directionIds.includes(initial.direction_id);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function createDefaultDirection(): Promise<number | null> {
+    setCreatingDirection(true);
+    try {
+      const pipes = await apiFetch<Pipeline[]>("/api/pipelines");
+      const pipe = pipes[0];
+      if (!pipe) {
+        toast.error("Сначала создайте воронку в CRM");
+        return null;
+      }
+      const created = await apiFetch<BookingDirection>("/api/booking/directions", {
+        method: "POST",
+        body: JSON.stringify({
+          name: "Консультация",
+          duration_min: 60,
+          pipeline_id: pipe.id,
+        }),
+      });
+      toast.success("Направление «Консультация» создано");
+      setDirectionIds([created.id]);
+      onDirectionsChanged?.();
+      return created.id;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Не удалось создать направление");
+      return null;
+    } finally {
+      setCreatingDirection(false);
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!fullName.trim()) return;
     if (workStart >= workEnd) return;
     if (!workWeekdays.length) return;
-    if (!directionIds.length) return;
-    // Менеджер не снимает уже назначенные «Курс»/«Протокол» при сохранении графика.
     let submitIds = [...directionIds];
+    if (!submitIds.length) {
+      const createdId = await createDefaultDirection();
+      if (createdId == null) return;
+      submitIds = [createdId];
+    }
+    // Менеджер не снимает уже назначенные «Курс»/«Протокол» при сохранении графика.
     if (!canAssignCourseDirections && initial) {
       const existingCourseIds = (initial.direction_ids?.length
         ? initial.direction_ids
@@ -211,7 +253,7 @@ export function SpecialistModal({
       full_name: fullName.trim(),
       phone: phone.trim(),
       specialization: specialization.trim(),
-      direction_id: submitIds[0],
+      direction_id: submitIds[0] ?? null,
       direction_ids: submitIds,
       slot_duration_min: slotDurationMin,
       work_start_hour: workStart,
@@ -422,7 +464,35 @@ export function SpecialistModal({
               })}
             </div>
             {!activeDirections.length && (
-              <p className="mt-1 text-xs text-amber-600">Нет активных направлений — добавьте в разделе направлений.</p>
+              <div className="mt-2 space-y-2 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5">
+                <p className="text-xs text-amber-800 dark:text-amber-200">
+                  Нет активных направлений записи — без них специалиста добавить нельзя. Создайте
+                  «Консультацию» одним нажатием или откройте раздел направлений.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn-primary px-3 py-1.5 text-xs"
+                    disabled={creatingDirection || isSubmitting}
+                    onClick={() => void createDefaultDirection()}
+                  >
+                    {creatingDirection ? "Создание…" : "Создать «Консультация»"}
+                  </button>
+                  {onOpenDirectionsPanel ? (
+                    <button
+                      type="button"
+                      className="btn-secondary px-3 py-1.5 text-xs"
+                      disabled={creatingDirection || isSubmitting}
+                      onClick={() => {
+                        onClose();
+                        onOpenDirectionsPanel();
+                      }}
+                    >
+                      Раздел направлений
+                    </button>
+                  ) : null}
+                </div>
+              </div>
             )}
             {hasArchivedPrimary && (
               <span className="mt-1 block text-xs text-amber-600">
@@ -467,13 +537,17 @@ export function SpecialistModal({
                 disabled={
                   isSubmitting ||
                   isDeleting ||
+                  creatingDirection ||
                   workStart >= workEnd ||
-                  !workWeekdays.length ||
-                  !directionIds.length
+                  !workWeekdays.length
                 }
                 className="h-11 btn-primary"
               >
-                {isSubmitting ? "Сохранение…" : mode === "add" ? "Добавить" : "Сохранить"}
+                {isSubmitting || creatingDirection
+                  ? "Сохранение…"
+                  : mode === "add"
+                    ? "Добавить"
+                    : "Сохранить"}
               </button>
             </div>
             {mode === "edit" && onDelete ? (

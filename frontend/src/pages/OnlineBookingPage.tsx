@@ -384,6 +384,43 @@ export function OnlineBookingPage() {
     queryKey: ["pipelines"],
     queryFn: () => apiFetch<Pipeline[]>("/api/pipelines"),
   });
+
+  // CRM-DN: без направлений нельзя добавить специалиста — создаём «Консультацию» сами.
+  useEffect(() => {
+    if (!canEditBooking) return;
+    if (!directionsQuery.isSuccess || !pipelinesQuery.isSuccess) return;
+    const active = (directionsQuery.data ?? []).filter((d) => d.is_active);
+    if (active.length > 0) return;
+    const pipe = pipelinesQuery.data?.[0];
+    if (!pipe) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        await apiFetch<BookingDirection>("/api/booking/directions", {
+          method: "POST",
+          body: JSON.stringify({
+            name: "Консультация",
+            duration_min: 60,
+            pipeline_id: pipe.id,
+          }),
+        });
+        if (!cancelled) {
+          await directionsQuery.refetch();
+        }
+      } catch {
+        /* панель / модалка покажут кнопку ручного создания */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    canEditBooking,
+    directionsQuery.isSuccess,
+    directionsQuery.data,
+    pipelinesQuery.isSuccess,
+    pipelinesQuery.data,
+  ]);
   const leadStagesQuery = useQuery({
     queryKey: ["stages", "booking-lead", newLeadPipelineId],
     queryFn: () =>
@@ -2308,6 +2345,18 @@ export function OnlineBookingPage() {
         }}
         onSubmit={handleSpecialistModalSubmit}
         onDelete={specialistModalMode === "edit" && canEditBooking ? handleDeleteSpecialistFromModal : undefined}
+        onDirectionsChanged={() => {
+          void directionsQuery.refetch();
+        }}
+        onOpenDirectionsPanel={
+          canEditBooking
+            ? () => {
+                setSpecialistModalOpen(false);
+                setSpecialistModalTarget(null);
+                setDirectionsPanelOpen(true);
+              }
+            : undefined
+        }
       />
 
       <BookingDirectionsPanel
