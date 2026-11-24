@@ -124,6 +124,44 @@ def test_rename_changes_only_the_open_month(tmp_path: Path):
                         ),
                     ],
                 )
+
+            await apply_service_rate_edits(
+                session,
+                company_id=company.id,
+                pipeline_id=pipe.id,
+                year_month="2026-10",
+                items=[
+                    SimpleNamespace(
+                        service_key="new:1",
+                        manager_percent=Decimal("7"),
+                        name="Пакет VIP",
+                    ),
+                ],
+            )
+            await session.commit()
+            created = (
+                await session.execute(
+                    select(SalesKpiPlanItem).where(SalesKpiPlanItem.name == "Пакет VIP"),
+                )
+            ).scalar_one()
+            assert created.year_month == date(2026, 10, 1)
+            assert Decimal(str(created.manager_percent)) == Decimal("7.00")
+            assert created.source_type in ("manual", "direction")
+
+            with pytest.raises(HTTPException):
+                await apply_service_rate_edits(
+                    session,
+                    company_id=company.id,
+                    pipeline_id=pipe.id,
+                    year_month="2026-10",
+                    items=[
+                        SimpleNamespace(
+                            service_key="new:2",
+                            manager_percent=Decimal("5"),
+                            name="пакет vip",
+                        ),
+                    ],
+                )
         await engine.dispose()
 
     asyncio.run(_run())

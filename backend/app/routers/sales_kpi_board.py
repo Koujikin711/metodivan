@@ -1098,9 +1098,51 @@ async def apply_service_rate_edits(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    if ym is None and any((it.service_key or "").strip().startswith("new:") for it in items):
+        raise HTTPException(status_code=400, detail="Укажите месяц")
+
     products: list[tuple[SalesKpiPlanItem, object]] = []
     for item in items:
         key = (item.service_key or "").strip()
+        if key.startswith("new:"):
+            if ym is None:
+                raise HTTPException(status_code=400, detail="Укажите месяц")
+            new_name = _clean_service_name(item.name)
+            if not new_name:
+                raise HTTPException(status_code=400, detail="Укажите название новой услуги")
+            # Дубль названия в этом месяце
+            existing_month = await load_plan_items(
+                db, company_id=company_id, pipeline_id=pipeline_id, ym=ym,
+            )
+            wanted = _norm_kpi_label(new_name)
+            if any(_norm_kpi_label(row.name) == wanted for row in existing_month):
+                raise HTTPException(status_code=400, detail=f"Услуга «{new_name}» уже есть в этом месяце")
+            sort_base = max((int(row.sort_order or 0) for row in existing_month), default=-1) + 1
+            product = SalesKpiPlanItem(
+                company_id=company_id,
+                pipeline_id=pipeline_id,
+                year_month=ym,
+                name=new_name,
+                plan_qty=0,
+                weight_percent=Decimal("0"),
+                manager_percent=Decimal(str(item.manager_percent or 0)).quantize(Decimal("0.01")),
+                source_type="manual",
+                direction_id=None,
+                sort_order=sort_base,
+            )
+            db.add(product)
+            await db.flush()
+            await _retarget_renamed_service(db, product, new_name)
+            if product.direction_id is not None:
+                product.source_type = "direction"
+                db.add(
+                    SalesKpiPlanItemService(
+                        plan_item_id=int(product.id),
+                        direction_id=int(product.direction_id),
+                    ),
+                )
+            products.append((product, item))
+            continue
         if not key.startswith("p:"):
             raise HTTPException(status_code=400, detail=f"Неизвестная услуга: {key}")
         product = await db.get(SalesKpiPlanItem, int(key[2:]))
@@ -1110,6 +1152,9 @@ async def apply_service_rate_edits(
 
     renames: list[tuple[SalesKpiPlanItem, str, str]] = []
     for product, item in products:
+        key = (item.service_key or "").strip()
+        if key.startswith("new:"):
+            continue  # уже создали с нужным именем
         if item.name is None:
             continue
         if ym is None:

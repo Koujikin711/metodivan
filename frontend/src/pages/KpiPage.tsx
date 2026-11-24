@@ -755,6 +755,11 @@ export function KpiPage() {
 
   const [rateDraft, setRateDraft] = useState<Record<string, string>>({});
   const [nameDraft, setNameDraft] = useState<Record<string, string>>({});
+  /** Новые продукты до сохранения (service_key = new:N). */
+  const [newServiceRows, setNewServiceRows] = useState<
+    { key: string; name: string; percent: string }[]
+  >([]);
+  const [newServiceSeq, setNewServiceSeq] = useState(1);
 
   const [saleForm, setSaleForm] = useState({
     plan_item_id: "",
@@ -1010,12 +1015,21 @@ export function KpiPage() {
     }
     setRateDraft(next);
     setNameDraft(names);
-  }, [ratesQuery.data]);
+    setNewServiceRows([]);
+  }, [ratesQuery.data, yearMonth, pipelineId]);
+
+  function addManualServiceRow() {
+    const key = `new:${newServiceSeq}`;
+    setNewServiceSeq((n) => n + 1);
+    setNewServiceRows((rows) => [...rows, { key, name: "", percent: "10" }]);
+    setNameDraft((prev) => ({ ...prev, [key]: "" }));
+    setRateDraft((prev) => ({ ...prev, [key]: "10" }));
+  }
 
   const saveRatesMutation = useMutation({
     mutationFn: async () => {
       if (!pipelineId) throw new Error("Выберите воронку");
-      const items = (ratesQuery.data?.items ?? []).map((row) => {
+      const existing = (ratesQuery.data?.items ?? []).map((row) => {
         const raw = (rateDraft[row.service_key] ?? "").trim().replace(",", ".");
         const percent = raw === "" ? 0 : Number(raw);
         const name = (nameDraft[row.service_key] ?? row.name).trim().replace(/\s+/g, " ");
@@ -1025,13 +1039,28 @@ export function KpiPage() {
         }
         return { service_key: row.service_key, manager_percent: percent, name };
       });
+      const created = newServiceRows.map((row) => {
+        const raw = (rateDraft[row.key] ?? row.percent).trim().replace(",", ".");
+        const percent = raw === "" ? 0 : Number(raw);
+        const name = (nameDraft[row.key] ?? row.name).trim().replace(/\s+/g, " ");
+        if (!name) throw new Error("Укажите название нового продукта");
+        if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+          throw new Error(`Процент для «${name}» — число от 0 до 100`);
+        }
+        return { service_key: row.key, manager_percent: percent, name };
+      });
       await apiFetch<void>("/api/sales-kpi/service-rates", {
         method: "PUT",
-        body: JSON.stringify({ pipeline_id: pipelineId, year_month: yearMonth, items }),
+        body: JSON.stringify({
+          pipeline_id: pipelineId,
+          year_month: yearMonth,
+          items: [...existing, ...created],
+        }),
       });
     },
     onSuccess: () => {
       toast.success("Услуги сохранены");
+      setNewServiceRows([]);
       void queryClient.invalidateQueries({ queryKey: ["sales-kpi-service-rates"] });
       void queryClient.invalidateQueries({ queryKey: ["sales-kpi-service-earnings"] });
       void queryClient.invalidateQueries({ queryKey: ["sales-kpi-weighted-plan"] });
@@ -1583,10 +1612,12 @@ export function KpiPage() {
           {ratesQuery.isError ? (
             <p className="text-sm text-red-300">{(ratesQuery.error as Error).message}</p>
           ) : null}
-          {!ratesQuery.isLoading && (ratesQuery.data?.items.length ?? 0) === 0 ? (
-            <p className="text-sm lux-caption">В этой воронке нет услуг.</p>
+          {!ratesQuery.isLoading &&
+          (ratesQuery.data?.items.length ?? 0) === 0 &&
+          newServiceRows.length === 0 ? (
+            <p className="text-sm lux-caption">В этой воронке нет услуг — добавьте продукт вручную.</p>
           ) : null}
-          {(ratesQuery.data?.items.length ?? 0) > 0 ? (
+          {(ratesQuery.data?.items.length ?? 0) > 0 || newServiceRows.length > 0 ? (
             <p className="text-[11px] font-medium mo-muted">Название, под ним процент</p>
           ) : null}
           <div className="kpi-rate-row">
@@ -1617,7 +1648,59 @@ export function KpiPage() {
                 />
               </div>
             ))}
+            {newServiceRows.map((row) => (
+              <div key={row.key} className="flex min-w-0 flex-col gap-1 text-sm">
+                <input
+                  type="text"
+                  className="mo-input"
+                  aria-label="Название нового продукта"
+                  value={nameDraft[row.key] ?? row.name}
+                  onChange={(e) =>
+                    setNameDraft((prev) => ({ ...prev, [row.key]: e.target.value }))
+                  }
+                  placeholder="Новый продукт"
+                  autoComplete="off"
+                />
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className="mo-input min-w-0 flex-1"
+                    aria-label="Процент нового продукта"
+                    value={rateDraft[row.key] ?? row.percent}
+                    onChange={(e) =>
+                      setRateDraft((prev) => ({ ...prev, [row.key]: e.target.value }))
+                    }
+                    placeholder="%"
+                    autoComplete="off"
+                  />
+                  <button
+                    type="button"
+                    className="btn-secondary shrink-0 px-2 py-1 text-xs"
+                    title="Убрать"
+                    onClick={() => {
+                      setNewServiceRows((rows) => rows.filter((r) => r.key !== row.key));
+                      setNameDraft((prev) => {
+                        const next = { ...prev };
+                        delete next[row.key];
+                        return next;
+                      });
+                      setRateDraft((prev) => {
+                        const next = { ...prev };
+                        delete next[row.key];
+                        return next;
+                      });
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
+          <button type="button" className="btn-secondary text-sm" onClick={addManualServiceRow}>
+            + Добавить продукт
+          </button>
         </section>
       ) : null}
 
