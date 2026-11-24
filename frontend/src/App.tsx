@@ -172,7 +172,7 @@ export default function App() {
             color: "#0f172a",
             padding: "14px 18px",
             borderRadius: "12px",
-            boxShadow: "0 8px 24px -6px rgba(99, 102, 241, 0.12), 0 2px 8px -2px rgba(15, 23, 42, 0.08)",
+            boxShadow: "0 8px 24px -6px rgba(15, 118, 110, 0.12), 0 2px 8px -2px rgba(15, 23, 42, 0.08)",
             border: "1px solid #dbe2ef",
           },
         }}

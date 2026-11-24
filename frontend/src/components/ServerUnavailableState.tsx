@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import robotGif from "@/assets/server-unavailable-robot.gif";
+import { looksLikeServerOutageMessage } from "@/lib/serverOutage";
 
 type Props = {
   message?: string;
@@ -98,11 +99,5 @@ export function ServerUnavailableState({ message, onRetry }: Props) {
 }
 
 export function isServerUnavailableError(error: unknown): boolean {
-  const msg = error instanceof Error ? error.message : String(error ?? "");
-  return (
-    /временно недоступен\s*\(50[234]\)/i.test(msg) ||
-    /Сервер не работает/i.test(msg) ||
-    /Сервер не ответил за \d+ с/i.test(msg) ||
-    /Нет связи с (сервером|API)/i.test(msg)
-  );
+  return looksLikeServerOutageMessage(error);
 }

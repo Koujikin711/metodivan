@@ -1,3 +1,5 @@
+import { setServerOutage } from "@/lib/serverOutage";
+
 const TOKEN_KEY = "crm_access_token";
 const ACTIVE_COMPANY_ID_KEY = "crm_active_company_id";
 
@@ -149,13 +151,17 @@ export async function apiFetch<T>(path: string, init: ApiFetchInit = {}): Promis
         (e instanceof Error && e.name === "AbortError");
       if (aborted) {
         const sec = Math.round(timeoutMs / 1000);
-        throw new Error(`Сервер не ответил за ${sec} с. Попробуйте ещё раз.`);
+        const msg = `Сервер не ответил за ${sec} с. Попробуйте ещё раз.`;
+        setServerOutage(true, msg);
+        throw new Error(msg);
       }
       if (retryTransient && attempt < maxAttempts) {
         await sleep(attempt === 1 ? 700 : 1600);
         continue;
       }
-      throw new Error(formatFetchFailure(url, e));
+      const msg = formatFetchFailure(url, e);
+      setServerOutage(true, msg);
+      throw new Error(msg);
     } finally {
       window.clearTimeout(timeoutId);
     }
@@ -172,13 +178,21 @@ export async function apiFetch<T>(path: string, init: ApiFetchInit = {}): Promis
   }
 
   if (isTransientGateway(res.status, text, res.headers.get("content-type"))) {
-    throw new Error(gatewayUserMessage(res.status));
+    const msg = gatewayUserMessage(res.status);
+    setServerOutage(true, msg);
+    throw new Error(msg);
+  }
+
+  // Успешный ответ API — снимаем флаг outage (даже если раньше был деплой).
+  if (res.ok || (res.status >= 400 && res.status < 500 && res.status !== 408)) {
+    setServerOutage(false);
   }
 
   if (text && looksLikeHtmlPayload(text, res.headers.get("content-type"))) {
-    throw new Error(
-      "Сервер вернул HTML вместо JSON — прокси /api недоступен. Обновите страницу через минуту.",
-    );
+    const msg =
+      "Сервер вернул HTML вместо JSON — прокси /api недоступен. Обновите страницу через минуту.";
+    setServerOutage(true, msg);
+    throw new Error(msg);
   }
 
   if (res.status === 204) return undefined as T;

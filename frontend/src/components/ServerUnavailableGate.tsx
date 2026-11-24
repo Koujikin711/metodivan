@@ -1,39 +1,89 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import toast from "react-hot-toast";
 import { useLocation } from "react-router-dom";
 
 import {
   ServerUnavailableState,
   isServerUnavailableError,
 } from "@/components/ServerUnavailableState";
+import {
+  getServerOutageMessage,
+  isServerOutageActive,
+  setServerOutage,
+  subscribeServerOutage,
+} from "@/lib/serverOutage";
+
+const HEALTH_POLL_MS = 2500;
 
 /**
- * Если любой активный запрос упал с 502/503/504 — показываем робота поверх контента,
- * а не красную строку.
+ * Если API лёг (деплой Amvera / 502–504 / сеть) — один экран с роботом,
+ * без пачки тостов; сами тихо опрашиваем /health и поднимаем UI когда сервер ожил.
  */
 export function ServerUnavailableGate({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const location = useLocation();
-  const [down, setDown] = useState(false);
-  const [message, setMessage] = useState<string | undefined>();
+  const [down, setDown] = useState(() => isServerOutageActive());
+  const [message, setMessage] = useState<string | undefined>(() => getServerOutageMessage() || undefined);
+  const recoveringRef = useRef(false);
 
   useEffect(() => {
-    const scan = () => {
+    const scanQueries = () => {
       const queries = queryClient.getQueryCache().getAll();
       for (const q of queries) {
         if (q.state.status !== "error" || q.getObserversCount() === 0) continue;
         if (!isServerUnavailableError(q.state.error)) continue;
         const msg = q.state.error instanceof Error ? q.state.error.message : String(q.state.error);
-        setDown(true);
-        setMessage(msg);
+        setServerOutage(true, msg);
         return;
       }
-      setDown(false);
-      setMessage(undefined);
     };
-    scan();
-    return queryClient.getQueryCache().subscribe(() => scan());
+    scanQueries();
+    return queryClient.getQueryCache().subscribe(() => scanQueries());
   }, [queryClient, location.pathname]);
+
+  useEffect(() => {
+    return subscribeServerOutage((active) => {
+      setDown(active);
+      setMessage(active ? getServerOutageMessage() || undefined : undefined);
+      if (active) {
+        toast.dismiss();
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!down) return;
+    toast.dismiss();
+    let cancelled = false;
+
+    const probe = async () => {
+      if (cancelled || recoveringRef.current) return;
+      try {
+        const res = await fetch("/health", {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        recoveringRef.current = true;
+        setServerOutage(false);
+        await queryClient.invalidateQueries();
+        await queryClient.refetchQueries({ type: "active" });
+      } catch {
+        /* still down */
+      } finally {
+        recoveringRef.current = false;
+      }
+    };
+
+    void probe();
+    const id = window.setInterval(() => void probe(), HEALTH_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [down, queryClient]);
 
   if (!down) return <>{children}</>;
 
@@ -42,8 +92,20 @@ export function ServerUnavailableGate({ children }: { children: ReactNode }) {
       <ServerUnavailableState
         message={message}
         onRetry={() => {
-          void queryClient.invalidateQueries();
-          void queryClient.refetchQueries({ type: "active" });
+          void (async () => {
+            try {
+              const res = await fetch("/health", {
+                method: "GET",
+                headers: { Accept: "application/json" },
+                cache: "no-store",
+              });
+              if (res.ok) setServerOutage(false);
+            } catch {
+              /* keep overlay */
+            }
+            void queryClient.invalidateQueries();
+            void queryClient.refetchQueries({ type: "active" });
+          })();
         }}
       />
     </div>
