@@ -45,7 +45,7 @@ async def _ensure_pipeline(db: AsyncSession, company_id: int, owner_id: int) -> 
         await db.execute(select(Pipeline).where(Pipeline.company_id == company_id).limit(1))
     ).scalars().first()
     if pipe is None:
-        pipe = Pipeline(name="Sales funnel", type="sales", company_id=company_id)
+        pipe = Pipeline(name="Маркетинг", type="sales", company_id=company_id)
         db.add(pipe)
         await db.flush()
         db.add(UserPipelineAssignment(user_id=owner_id, pipeline_id=pipe.id, company_id=company_id))

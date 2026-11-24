@@ -31,8 +31,8 @@ export function CrmToolbar({
   onImport,
   onDownloadBase,
   pipelines,
-  pipelineId,
-  onSelectPipeline,
+  pipelineId: _pipelineId,
+  onSelectPipeline: _onSelectPipeline,
   crmView,
   onSetView,
   boardSearchInput,
@@ -89,16 +89,10 @@ export function CrmToolbar({
           <div className="crm-toolbar__funnels">
             <span className="crm-toolbar__label">Воронка</span>
             <div className="crm-toolbar__pills" role="group" aria-label="Воронка">
-              {pipelines.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => onSelectPipeline(p.id)}
-                  className={pipelineId === p.id ? "crm-pill-btn crm-pill-btn--active" : "crm-pill-btn"}
-                >
-                  {p.name}
-                </button>
-              ))}
+              {/* CRM-DN: одна воронка «Маркетинг», без переключателя */}
+              <span className="crm-pill-btn crm-pill-btn--active" aria-current="true">
+                Маркетинг
+              </span>
             </div>
           </div>
 
