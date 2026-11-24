@@ -42,8 +42,15 @@ async def create_source(
     current_user: CurrentUser,
     company_id: CurrentCompanyId,
 ) -> LeadSourceRead:
-    if current_user.role != UserRole.owner:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
+    if current_user.role not in (
+        UserRole.owner,
+        UserRole.super_owner,
+        UserRole.admin,
+        UserRole.administrator,
+        UserRole.rop,
+        UserRole.manager,
+    ):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для добавления источника")
 
     name = body.name.strip()
     exists = await db.scalar(
@@ -70,8 +77,14 @@ async def patch_source(
     current_user: CurrentUser,
     company_id: CurrentCompanyId,
 ) -> LeadSourceRead:
-    if current_user.role != UserRole.owner:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
+    if current_user.role not in (
+        UserRole.owner,
+        UserRole.super_owner,
+        UserRole.admin,
+        UserRole.administrator,
+        UserRole.rop,
+    ):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав")
 
     s = await db.get(LeadSource, source_id)
     if s is None or s.company_id != company_id:

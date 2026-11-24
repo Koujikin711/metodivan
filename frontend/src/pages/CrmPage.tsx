@@ -836,7 +836,10 @@ export function CrmPage() {
   const [leadName, setLeadName] = useState("");
   const [leadPhone, setLeadPhone] = useState("");
   const [leadEmail, setLeadEmail] = useState("");
+  /** Имя из справочника или пусто → своё. */
   const [leadSource, setLeadSource] = useState("");
+  const [leadSourceCustom, setLeadSourceCustom] = useState("");
+  const [leadSourceMode, setLeadSourceMode] = useState<"catalog" | "custom">("catalog");
   const [leadPipelineId, setLeadPipelineId] = useState<number | null>(null);
   const [leadStageId, setLeadStageId] = useState<number | null>(null);
 
@@ -881,13 +884,20 @@ export function CrmPage() {
       if (!leadStageId) {
         throw new Error("Выберите стадию");
       }
+      const resolvedSource =
+        leadSourceMode === "custom"
+          ? leadSourceCustom.trim()
+          : leadSource.trim();
+      if (!resolvedSource) {
+        throw new Error("Укажите источник лида");
+      }
       return apiFetch<Lead>("/api/leads", {
         method: "POST",
         body: JSON.stringify({
           name: leadName.trim(),
           phone: leadPhone.trim(),
           email: leadEmail.trim() || null,
-          source: leadSource.trim() || null,
+          source: resolvedSource,
           status_id: leadStageId,
         }),
       });
@@ -899,6 +909,8 @@ export function CrmPage() {
       setLeadPhone("");
       setLeadEmail("");
       setLeadSource("");
+      setLeadSourceCustom("");
+      setLeadSourceMode("catalog");
       setLeadStageId(null);
       void queryClient.invalidateQueries({ queryKey: ["leads"] });
       void queryClient.invalidateQueries({ queryKey: ["leads-table"] });
@@ -2729,14 +2741,24 @@ export function CrmPage() {
                   className="mo-input mt-1 w-full"
                 />
               </label>
-              <label className="text-sm mo-muted">
-                Источник
+              <div className="text-sm mo-muted">
+                <span>Источник</span>
                 <select
-                  value={leadSource}
-                  onChange={(e) => setLeadSource(e.target.value)}
+                  value={leadSourceMode === "custom" ? "__custom__" : leadSource}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "__custom__") {
+                      setLeadSourceMode("custom");
+                      setLeadSource("");
+                      return;
+                    }
+                    setLeadSourceMode("catalog");
+                    setLeadSource(v);
+                    setLeadSourceCustom("");
+                  }}
                   className="mo-input mt-1 w-full"
                 >
-                  <option value="">—</option>
+                  <option value="">— выберите источник —</option>
                   {(sourcesQuery.data ?? [])
                     .filter((s) => s.is_active)
                     .map((s) => (
@@ -2744,8 +2766,21 @@ export function CrmPage() {
                         {s.name}
                       </option>
                     ))}
+                  <option value="__custom__">Свой источник…</option>
                 </select>
-              </label>
+                {leadSourceMode === "custom" ? (
+                  <input
+                    value={leadSourceCustom}
+                    onChange={(e) => setLeadSourceCustom(e.target.value)}
+                    placeholder="Например: Рекомендация / Сайт / Реклама"
+                    className="mo-input mt-2 w-full"
+                    autoComplete="off"
+                  />
+                ) : null}
+                <p className="mt-1 text-[11px] mo-muted">
+                  Можно выбрать из списка или указать свой источник.
+                </p>
+              </div>
 
               <div className="grid gap-2 sm:grid-cols-2">
                 <label className="text-sm mo-muted">
