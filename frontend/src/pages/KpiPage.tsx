@@ -1070,19 +1070,19 @@ export function KpiPage() {
   const createSaleMutation = useMutation({
     mutationFn: async () => {
       if (!pipelineId) throw new Error("Выберите воронку");
-      if (!saleForm.group_no) throw new Error("Укажите поток");
       const clientName = saleForm.client_name.trim() || selectedLead?.name?.trim() || "";
       const clientPhone = saleForm.client_phone.trim() || selectedLead?.phone?.trim() || "";
       if (!clientName) throw new Error("Укажите имя клиента или выберите пациента");
       if (!clientPhone) throw new Error("Укажите телефон или выберите пациента с телефоном");
+      const groupNo = saleForm.group_no ? Number(saleForm.group_no) : null;
       await apiFetch<SalesKpiManualSale>("/api/sales-kpi/manual-sales", {
         method: "POST",
         body: JSON.stringify({
           pipeline_id: pipelineId,
           plan_item_id: Number(saleForm.plan_item_id),
           manager_user_id: Number(saleForm.manager_user_id),
-          stream_no: 1,
-          group_no: Number(saleForm.group_no),
+          stream_no: null,
+          group_no: groupNo,
           client_name: clientName,
           client_phone: clientPhone,
           lead_id: selectedLead?.lead_id ?? null,
@@ -1980,12 +1980,12 @@ export function KpiPage() {
                 </select>
               </label>
               <label className="flex flex-col gap-0.5 text-[11px] mo-muted md:col-span-2">
-                Поток
+                Поток <span className="font-normal opacity-70">(необязательно)</span>
                 <select
                   className="mo-input !min-h-11 text-base sm:!min-h-0 sm:text-sm"
                   value={saleForm.group_no}
                   onChange={(e) => setSaleForm((s) => ({ ...s, group_no: e.target.value }))}
-                  title="Один номер — один поток куратора"
+                  title="Можно оставить пустым; один номер — один поток куратора"
                 >
                   <option value="">—</option>
                   {KPI_GROUP_OPTIONS.map((n) => (
