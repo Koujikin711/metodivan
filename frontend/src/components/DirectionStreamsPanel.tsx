@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { apiFetch } from "@/lib/api";
 import type { BookingDirection } from "@/lib/types";
 
-/** CRM-DN продукты записи (вместо клинических «потоков курсов»). */
+/** CRM-DN услуги записи (вместо клинических «потоков курсов»). */
 export const CRM_DN_DEFAULT_PRODUCTS = [
   { name: "Интенсив", duration_min: 60 },
   { name: "Курс «Мисли Дилноза»", duration_min: 60 },
@@ -43,22 +43,25 @@ export function DirectionStreamsPanel() {
   const createMut = useMutation({
     mutationFn: (body: { name: string; duration_min: number }) => {
       if (pipelineId === "") throw new Error("Выберите воронку");
+      const name = body.name.trim();
+      if (!name) throw new Error("Укажите название услуги");
+      const duration = Math.min(480, Math.max(10, Number(body.duration_min) || 60));
       return apiFetch<BookingDirection>("/api/booking/directions", {
         method: "POST",
         body: JSON.stringify({
-          name: body.name.trim(),
-          duration_min: body.duration_min,
+          name,
+          duration_min: duration,
           pipeline_id: pipelineId,
         }),
       });
     },
-    onSuccess: () => {
-      toast.success("Продукт добавлен");
+    onSuccess: (row) => {
+      toast.success(`Услуга «${row.name}» добавлена`);
       setNewName("");
       setNewDuration(60);
       invalidate();
     },
-    onError: (e: Error) => toast.error(e.message || "Не удалось добавить продукт"),
+    onError: (e: Error) => toast.error(e.message || "Не удалось добавить услугу"),
   });
 
   const seedMut = useMutation({
@@ -83,32 +86,38 @@ export function DirectionStreamsPanel() {
       return created;
     },
     onSuccess: (n) => {
-      if (n === 0) toast.success("Базовые продукты уже есть");
-      else toast.success(`Добавлено продуктов: ${n}`);
+      if (n === 0) toast.success("Базовые услуги уже есть");
+      else toast.success(`Добавлено услуг: ${n}`);
       invalidate();
     },
-    onError: (e: Error) => toast.error(e.message || "Не удалось добавить продукты"),
+    onError: (e: Error) => toast.error(e.message || "Не удалось добавить услуги"),
   });
 
   const archiveMut = useMutation({
     mutationFn: (id: number) =>
       apiFetch<void>(`/api/booking/directions/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Продукт скрыт");
+      toast.success("Услуга скрыта");
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message || "Не удалось скрыть"),
   });
 
+  function submitManual() {
+    createMut.mutate({ name: newName, duration_min: newDuration });
+  }
+
   const products = (directionsQ.data ?? []).filter((d) => d.is_active);
+  const canSubmit = pipelineId !== "" && Boolean(newName.trim()) && !createMut.isPending;
 
   return (
     <section className="mo-section space-y-3 p-3 sm:p-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div className="min-w-0 max-w-2xl">
-          <h2 className="text-sm font-semibold text-[var(--mo-text)] sm:text-base">Продукты</h2>
+          <h2 className="text-sm font-semibold text-[var(--mo-text)] sm:text-base">Услуги</h2>
           <p className="mt-0.5 text-[11px] leading-snug mo-muted">
-            Услуги записи: например <b className="text-[var(--mo-text)]">Интенсив</b>,{" "}
+            Список для онлайн-записи. Можно добавить своё название вручную или взять базовые:{" "}
+            <b className="text-[var(--mo-text)]">Интенсив</b>,{" "}
             <b className="text-[var(--mo-text)]">Курс «Мисли Дилноза»</b>, консультация.
           </p>
         </div>
@@ -129,55 +138,69 @@ export function DirectionStreamsPanel() {
         </label>
       </div>
 
-      <div className="rounded-xl border border-[var(--mo-border)] bg-[var(--mo-surface)] px-3 py-2 text-[11px] leading-relaxed mo-muted">
-        Продукты видны в онлайн-записи и при назначении специалисту.
-      </div>
-
-      <div className="flex flex-wrap items-end gap-2">
-        <label className="min-w-[12rem] flex-1 text-[11px] mo-muted">
-          Название
-          <input
-            className="mo-input mt-1 w-full text-sm"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Например: Интенсив"
-          />
-        </label>
-        <label className="w-24 text-[11px] mo-muted">
-          Мин
-          <input
-            type="number"
-            min={5}
-            max={480}
-            className="mo-input mt-1 w-full text-sm tabular-nums"
-            value={newDuration}
-            onChange={(e) => setNewDuration(Number(e.target.value) || 60)}
-          />
-        </label>
-        <button
-          type="button"
-          className="btn-primary px-3 py-2 text-sm"
-          disabled={pipelineId === "" || !newName.trim() || createMut.isPending}
-          onClick={() => createMut.mutate({ name: newName, duration_min: newDuration })}
-        >
-          {createMut.isPending ? "…" : "Добавить"}
-        </button>
-        <button
-          type="button"
-          className="btn-secondary px-3 py-2 text-sm"
-          disabled={pipelineId === "" || seedMut.isPending}
-          onClick={() => seedMut.mutate()}
-        >
-          {seedMut.isPending ? "…" : "Базовые продукты"}
-        </button>
+      <div className="rounded-xl border border-[var(--mo-accent)]/25 bg-[var(--mo-accent-soft)]/40 p-3">
+        <p className="text-xs font-semibold text-[var(--mo-text)]">Добавить услугу вручную</p>
+        <p className="mt-0.5 text-[11px] mo-muted">
+          Введите любое название — оно сразу появится в выборе услуги при записи.
+        </p>
+        <div className="mt-2 flex flex-wrap items-end gap-2">
+          <label className="min-w-[14rem] flex-1 text-[11px] mo-muted">
+            Название
+            <input
+              className="mo-input mt-1 w-full text-sm"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (canSubmit) submitManual();
+                }
+              }}
+              placeholder="Например: Интенсив или своя услуга"
+              autoComplete="off"
+            />
+          </label>
+          <label className="w-24 text-[11px] mo-muted">
+            Мин
+            <input
+              type="number"
+              min={10}
+              max={480}
+              step={5}
+              className="mo-input mt-1 w-full text-sm tabular-nums"
+              value={newDuration}
+              onChange={(e) => setNewDuration(Number(e.target.value) || 60)}
+            />
+          </label>
+          <button
+            type="button"
+            className="btn-primary px-3 py-2 text-sm"
+            disabled={!canSubmit}
+            onClick={submitManual}
+          >
+            {createMut.isPending ? "…" : "Добавить"}
+          </button>
+          <button
+            type="button"
+            className="btn-secondary px-3 py-2 text-sm"
+            disabled={pipelineId === "" || seedMut.isPending}
+            onClick={() => seedMut.mutate()}
+          >
+            {seedMut.isPending ? "…" : "Базовые услуги"}
+          </button>
+        </div>
       </div>
 
       {directionsQ.isLoading && <p className="text-sm lux-caption">Загрузка…</p>}
 
       {!directionsQ.isLoading && products.length === 0 && pipelineId !== "" && (
         <p className="text-sm mo-muted">
-          Нет продуктов в этой воронке. Нажмите «Базовые продукты» или добавьте своё название.
+          Пока пусто. Введите название выше и нажмите «Добавить», либо «Базовые услуги».
         </p>
+      )}
+
+      {pipelineId === "" && (
+        <p className="text-sm mo-muted">Сначала выберите воронку — затем можно добавить услугу.</p>
       )}
 
       {products.length > 0 ? (
@@ -196,7 +219,7 @@ export function DirectionStreamsPanel() {
                 className="text-xs font-medium text-rose-600 hover:underline disabled:opacity-50"
                 disabled={archiveMut.isPending}
                 onClick={() => {
-                  if (!window.confirm(`Скрыть продукт «${d.name}»?`)) return;
+                  if (!window.confirm(`Скрыть услугу «${d.name}»?`)) return;
                   archiveMut.mutate(d.id);
                 }}
               >

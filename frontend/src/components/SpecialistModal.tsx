@@ -101,6 +101,8 @@ export function SpecialistModal({
   const [workEnd, setWorkEnd] = useState(18);
   const [workWeekdays, setWorkWeekdays] = useState<number[]>([...DEFAULT_WEEKDAYS]);
   const [creatingDirection, setCreatingDirection] = useState(false);
+  const [newServiceName, setNewServiceName] = useState("");
+  const [newServiceDuration, setNewServiceDuration] = useState(60);
 
   const visibleDirections = useMemo(
     () =>
@@ -184,7 +186,15 @@ export function SpecialistModal({
     visibleDirections.some((d) => d.id === initial.direction_id && !d.is_active) &&
     !directionIds.includes(initial.direction_id);
 
-  async function createDefaultDirection(): Promise<number | null> {
+  async function createServiceByName(
+    name: string,
+    durationMin = 60,
+  ): Promise<number | null> {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      toast.error("Укажите название услуги");
+      return null;
+    }
     setCreatingDirection(true);
     try {
       const pipes = await apiFetch<Pipeline[]>("/api/pipelines");
@@ -196,21 +206,27 @@ export function SpecialistModal({
       const created = await apiFetch<BookingDirection>("/api/booking/directions", {
         method: "POST",
         body: JSON.stringify({
-          name: "Консультация",
-          duration_min: 60,
+          name: trimmed,
+          duration_min: Math.min(480, Math.max(10, Number(durationMin) || 60)),
           pipeline_id: pipe.id,
         }),
       });
-      toast.success("Направление «Консультация» создано");
-      setDirectionIds([created.id]);
+      toast.success(`Услуга «${created.name}» создана`);
+      setDirectionIds((prev) => (prev.includes(created.id) ? prev : [...prev, created.id]));
+      setNewServiceName("");
+      setNewServiceDuration(60);
       onDirectionsChanged?.();
       return created.id;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Не удалось создать направление");
+      toast.error(err instanceof Error ? err.message : "Не удалось создать услугу");
       return null;
     } finally {
       setCreatingDirection(false);
     }
+  }
+
+  async function createDefaultDirection(): Promise<number | null> {
+    return createServiceByName("Консультация", 60);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -371,9 +387,9 @@ export function SpecialistModal({
           </div>
 
           <div className="block text-sm mo-muted">
-            <p>Направления записи</p>
+            <p>Услуги записи</p>
             <p className="mt-0.5 text-xs mo-muted">
-              Несколько направлений. Повторный клик по выбранному делает его основным; по основному — снимает.
+              Можно выбрать несколько. Повторный клик по выбранной делает её основной; по основной — снимает.
             </p>
             <div className="mt-2 grid grid-cols-2 gap-1.5">
               {activeDirections.map((d) => {
@@ -390,7 +406,7 @@ export function SpecialistModal({
                         ? "border-indigo-500/50 bg-[var(--mo-accent-soft)] text-[var(--mo-text)]"
                         : "border-[var(--mo-border)] bg-transparent mo-muted",
                     ].join(" ")}
-                    title={isPrimary ? "Основное направление" : selected ? "Нажмите, чтобы снять" : "Добавить"}
+                    title={isPrimary ? "Основная услуга" : selected ? "Нажмите, чтобы снять" : "Добавить"}
                   >
                     <span className="truncate">{d.name}</span>
                     {isPrimary ? (
@@ -402,20 +418,57 @@ export function SpecialistModal({
                 );
               })}
             </div>
-            {!activeDirections.length && (
-              <div className="mt-2 space-y-2 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5">
-                <p className="text-xs text-amber-800 dark:text-amber-200">
-                  Нет активных направлений записи — без них специалиста добавить нельзя. Создайте
-                  «Консультацию» одним нажатием или откройте раздел направлений.
-                </p>
-                <div className="flex flex-wrap gap-2">
+
+            <div className="mt-3 space-y-2 rounded-xl border border-[var(--mo-accent)]/25 bg-[var(--mo-accent-soft)]/35 p-3">
+              <p className="text-xs font-medium text-[var(--mo-text)]">Добавить услугу вручную</p>
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="min-w-[10rem] flex-1 text-[11px] mo-muted">
+                  Название
+                  <input
+                    value={newServiceName}
+                    onChange={(e) => setNewServiceName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (!creatingDirection && newServiceName.trim()) {
+                          void createServiceByName(newServiceName, newServiceDuration);
+                        }
+                      }
+                    }}
+                    className="mo-input mt-1 w-full text-sm"
+                    placeholder="Интенсив / своя услуга"
+                    autoComplete="off"
+                  />
+                </label>
+                <label className="w-20 text-[11px] mo-muted">
+                  Мин
+                  <input
+                    type="number"
+                    min={10}
+                    max={480}
+                    value={newServiceDuration}
+                    onChange={(e) => setNewServiceDuration(Number(e.target.value) || 60)}
+                    className="mo-input mt-1 w-full text-sm tabular-nums"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn-primary px-3 py-2 text-xs"
+                  disabled={creatingDirection || isSubmitting || !newServiceName.trim()}
+                  onClick={() => void createServiceByName(newServiceName, newServiceDuration)}
+                >
+                  {creatingDirection ? "…" : "Добавить"}
+                </button>
+              </div>
+              {!activeDirections.length ? (
+                <div className="flex flex-wrap gap-2 pt-1">
                   <button
                     type="button"
-                    className="btn-primary px-3 py-1.5 text-xs"
+                    className="btn-secondary px-3 py-1.5 text-xs"
                     disabled={creatingDirection || isSubmitting}
                     onClick={() => void createDefaultDirection()}
                   >
-                    {creatingDirection ? "Создание…" : "Создать «Консультация»"}
+                    Быстро: «Консультация»
                   </button>
                   {onOpenDirectionsPanel ? (
                     <button
@@ -427,15 +480,16 @@ export function SpecialistModal({
                         onOpenDirectionsPanel();
                       }}
                     >
-                      Раздел направлений
+                      Все услуги
                     </button>
                   ) : null}
                 </div>
-              </div>
-            )}
+              ) : null}
+            </div>
+
             {hasArchivedPrimary && (
               <span className="mt-1 block text-xs text-amber-600">
-                Ранее было архивное направление — выберите активные и сохраните.
+                Ранее была архивная услуга — выберите активные и сохраните.
               </span>
             )}
           </div>

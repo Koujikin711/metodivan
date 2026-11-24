@@ -262,8 +262,13 @@ export function OnlineBookingPage() {
   });
   const canEditBooking = !isExpert || Boolean(bookingViewerQuery.data?.is_chief_expert);
   const canMarkAttendance = canEditBooking && currentRole !== "manager";
+  /** Каталог услуг (бывш. направления): админы и менеджеры могут добавлять вручную. */
   const canEditDirectionStreams =
-    currentRole === "owner" || currentRole === "admin" || currentRole === "administrator";
+    currentRole === "owner" ||
+    currentRole === "super_owner" ||
+    currentRole === "admin" ||
+    currentRole === "administrator" ||
+    currentRole === "manager";
   /** Возврат оплаты: admin / administrator / owner. */
   const canRefundBooking =
     currentRole === "owner" ||
