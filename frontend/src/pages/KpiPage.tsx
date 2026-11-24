@@ -770,9 +770,7 @@ export function KpiPage() {
     client_phone: "",
     service_amount: "",
     paid_amount: "",
-    second_paid_amount: "",
     first_paid_at: "",
-    second_paid_at: "",
     note: "",
   });
   const [selectedLead, setSelectedLead] = useState<KpiLeadPick | null>(null);
@@ -1090,9 +1088,9 @@ export function KpiPage() {
           lead_id: selectedLead?.lead_id ?? null,
           service_amount: Number(saleForm.service_amount),
           paid_amount: Number(saleForm.paid_amount || 0),
-          second_paid_amount: Number(saleForm.second_paid_amount || 0),
+          second_paid_amount: 0,
           first_paid_at: saleForm.first_paid_at || null,
-          second_paid_at: saleForm.second_paid_at || null,
+          second_paid_at: null,
           note: saleForm.note.trim() || null,
         }),
       });
@@ -1114,9 +1112,7 @@ export function KpiPage() {
         client_phone: "",
         service_amount: "",
         paid_amount: "",
-        second_paid_amount: "",
         first_paid_at: "",
-        second_paid_at: "",
         note: "",
       });
       setSelectedLead(null);
@@ -2031,28 +2027,9 @@ export function KpiPage() {
                     aria-label="Дата первого платежа"
                   />
                 </label>
-                <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
-                  Второй платёж
-                  <input
-                    type="number"
-                    min={0}
-                    inputMode="decimal"
-                    className="mo-input !min-h-11 text-base sm:!min-h-0 sm:text-sm"
-                    value={saleForm.second_paid_amount}
-                    onChange={(e) => setSaleForm((s) => ({ ...s, second_paid_amount: e.target.value }))}
-                  />
-                </label>
-                <label className="kpi-sale-pays__date flex flex-col gap-0.5 text-[11px] mo-muted">
-                  Дата 2-го
-                  <DateField
-                    value={saleForm.second_paid_at}
-                    onChange={(v) => setSaleForm((s) => ({ ...s, second_paid_at: v }))}
-                    aria-label="Дата второго платежа"
-                  />
-                </label>
                 {isManager ? null : (
                   <p className="kpi-sale-pays__hint">
-                    пусто → сегодня; выручка по месяцу даты, KPI менеджера — только 1-й платёж
+                    пусто → сегодня; выручка по месяцу даты. Доплату позже — из карточки продажи.
                   </p>
                 )}
               </div>
