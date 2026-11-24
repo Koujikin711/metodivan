@@ -241,6 +241,13 @@ export async function apiFetch<T>(path: string, init: ApiFetchInit = {}): Promis
       }
     }
 
+    // Studio Demo и др. отключённые учётки отдают 403 — сразу на логин, без спама тостов.
+    if (res.status === 403 && token && message === "Аккаунт отключён") {
+      setStoredToken(null);
+      window.location.assign("/login?session=disabled");
+      throw new Error("Аккаунт отключён. Войдите под рабочей учёткой.");
+    }
+
     if (res.status === 403 && token && message === "Компания временно приостановлена") {
       setStoredToken(null);
       window.location.assign("/login?session=company_suspended");
