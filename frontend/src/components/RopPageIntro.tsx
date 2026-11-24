@@ -1,4 +1,4 @@
-/** Короткий заголовок раздела кабинета РОМ. */
+/** Короткий заголовок раздела кабинета РОП. */
 
 export function RopPageIntro({ title, hint }: { title: string; hint: string }) {
   return (

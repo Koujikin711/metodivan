@@ -183,14 +183,14 @@ function buildShellSidebarNavItemsRaw(params: BuildParams): ShellSidebarNavItem[
     ];
   }
 
-  // РОМ: только кабинет продаж
+  // РОП: только кабинет продаж
   if (isRop) {
     return [
       {
         id: "rop-dashboard",
         to: "/rop",
         end: true,
-        title: "Дашборд РОМ",
+        title: "Дашборд РОП",
         labelShort: "Дашборд",
         labelFull: "Дашборд",
         variant: "platform",
@@ -575,9 +575,9 @@ function buildShellSidebarNavItemsRaw(params: BuildParams): ShellSidebarNavItem[
       items.push({
         id: "marketing",
         to: "/marketing",
-        title: "Маркетинг",
-        labelShort: "Маркет.",
-        labelFull: "Маркетинг · Meta Ads",
+        title: "Кабинет РОМ",
+        labelShort: "РОМ",
+        labelFull: "Кабинет РОМ",
         variant: "purple",
         iconKey: "bar-chart",
       });
@@ -716,9 +716,9 @@ function buildShellSidebarNavItemsRaw(params: BuildParams): ShellSidebarNavItem[
   items.push({
     id: "rop-cabinet",
     to: "/rop",
-    title: "Кабинет РОМ",
-    labelShort: "РОМ",
-    labelFull: "Кабинет РОМ",
+    title: "Кабинет РОП",
+    labelShort: "РОП",
+    labelFull: "Кабинет РОП",
     variant: "platform",
     iconKey: "layout-dashboard",
   });
@@ -781,9 +781,9 @@ function buildShellSidebarNavItemsRaw(params: BuildParams): ShellSidebarNavItem[
     items.push({
       id: "marketing",
       to: "/marketing",
-      title: "Маркетинг",
-      labelShort: "Маркет.",
-      labelFull: "Маркетинг · Meta Ads",
+      title: "Кабинет РОМ",
+      labelShort: "РОМ",
+      labelFull: "Кабинет РОМ",
       variant: "purple",
       iconKey: "bar-chart",
     });

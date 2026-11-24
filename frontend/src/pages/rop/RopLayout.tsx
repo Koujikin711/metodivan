@@ -1,4 +1,4 @@
-/** Общая оболочка кабинета РОМ: табы + выбор воронки. */
+/** Общая оболочка кабинета РОП: табы + выбор воронки. */
 
 import { useQuery } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate, useOutletContext } from "react-router-dom";
@@ -76,7 +76,7 @@ export function RopLayout() {
     <div className="mo-page">
       <div className="mo-admin-page-head print-screen-only flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="mo-page-title">Кабинет РОМ</h1>
+          <h1 className="mo-page-title">Кабинет РОП</h1>
           <p className="mo-page-sub">Отдел продаж: менеджеры, лиды, выручка</p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
@@ -129,7 +129,7 @@ export function RopLayout() {
         </div>
       </div>
 
-      <nav className="rop-tabs print-screen-only" aria-label="Разделы кабинета РОМ">
+      <nav className="rop-tabs print-screen-only" aria-label="Разделы кабинета РОП">
         {TABS.map((t) => {
           const exact = "end" in t ? t.end : false;
           const active = exact ? pathname === t.to : pathname === t.to || pathname.startsWith(`${t.to}/`);

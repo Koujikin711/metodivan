@@ -289,7 +289,7 @@ export function MarketingPage() {
 
   return (
     <div className="marketing-page mo-page">
-      <PageHeader title="Маркетинг" />
+      <PageHeader title="Кабинет РОМ" />
 
       {configured && !showConnect ? (
         <div className="marketing-toolbar">
