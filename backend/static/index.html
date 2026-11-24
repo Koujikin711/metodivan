@@ -24,14 +24,18 @@
     />
     <script>
       (function () {
+        /* Один раз перевести на светлую teal CRM-DN (старый dark был navy/indigo). */
+        if (!localStorage.getItem("mo-theme-crmdn-teal-v1")) {
+          localStorage.setItem("mo-theme", "light");
+          localStorage.setItem("mo-theme-crmdn-teal-v1", "1");
+        }
         var t = localStorage.getItem("mo-theme");
-        if (t !== "dark" && t !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches) t = "dark";
         if (t === "dark") document.documentElement.dataset.theme = "dark";
         else document.documentElement.dataset.theme = "light";
       })();
     </script>
-    <script type="module" crossorigin src="/assets/index-B_YdvXBH.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-BlUghghP.css">
+    <script type="module" crossorigin src="/assets/index-B5zcbzdg.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-D-k6Kdrs.css">
   </head>
   <body>
     <div id="root"></div>

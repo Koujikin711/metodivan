@@ -3741,18 +3741,22 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   box-shadow: inset 0 2px 6px rgba(44, 37, 32, 0.04), 0 0 0 2px rgba(212, 175, 55, 0.2);
 }
 :root[data-theme="dark"] .mo-input {
-  background-color: #243149;
-  border-color: rgba(186, 198, 220, 0.34);
-  color: #f8fafc;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+  background-color: #1b342f;
+  border-color: rgba(167, 210, 198, 0.32);
+  color: #eef7f4;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22);
 }
 :root[data-theme="dark"] .mo-input::placeholder {
-  color: #aebbd0;
+  color: #8eaea4;
   opacity: 1;
 }
 :root[data-theme="dark"] .mo-input:focus {
-  border-color: rgba(165, 180, 252, 0.7);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18), 0 0 0 2px rgba(129, 140, 248, 0.32);
+  border-color: rgba(45, 212, 191, 0.65);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22), 0 0 0 2px rgba(15, 118, 110, 0.35);
+}
+:root[data-theme="dark"] select.mo-input {
+  background-color: #1b342f;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M6 8l4 4 4-4' stroke='%2399f6e4' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 .mo-section {
@@ -6952,7 +6956,7 @@ html[data-theme="dark"] .rop-dense {
 .extra-services-settings-btn.is-active {
   color: #fff;
   border-color: color-mix(in srgb, var(--mo-accent) 55%, transparent);
-  background: color-mix(in srgb, var(--mo-accent) 72%, #312e81);
+  background: #0f766e;
 }
 
 .extra-services-new-layout {
@@ -8986,7 +8990,7 @@ fieldset.extra-services-field {
     0 0 16px rgba(42, 111, 133, 0.28);
 }
 :root[data-theme="dark"] .chat-msg-in {
-  background: color-mix(in srgb, var(--mo-surface-elevated) 88%, #1e293b);
+  background: color-mix(in srgb, var(--mo-surface-elevated) 88%, #0c1a18);
   border-color: color-mix(in srgb, var(--mo-border) 90%, transparent);
 }
 
@@ -9476,9 +9480,9 @@ fieldset.extra-services-field {
 }
 
 :root[data-theme="dark"] .kpi-tabs__btn.is-active {
-  color: #f8fafc;
-  background: color-mix(in srgb, var(--mo-accent) 72%, #312e81);
-  border-color: color-mix(in srgb, var(--mo-accent) 55%, transparent);
+  color: #042f2e;
+  background: #2dd4bf;
+  border-color: #14b8a6;
 }
 
 .kpi-matrix-row-highlight {
@@ -9494,9 +9498,9 @@ fieldset.extra-services-field {
   color: var(--mo-text);
 }
 :root[data-theme="dark"] .kpi-cell-input {
-  border-color: rgba(148, 163, 184, 0.28);
-  background: rgba(12, 18, 34, 0.85);
-  color: #e8eef9;
+  border-color: rgba(167, 210, 198, 0.28);
+  background: #152a26;
+  color: #eef7f4;
 }
 .kpi-actual-value {
   color: var(--mo-success);
@@ -10770,16 +10774,16 @@ li.is-overdue {
 }
 
 :root[data-theme="dark"] .kpi-actions-trigger {
-  border-color: rgba(148, 163, 184, 0.22);
-  background: color-mix(in srgb, var(--mo-surface) 70%, #0c1222);
-  color: #e8eef9;
+  border-color: rgba(167, 210, 198, 0.28);
+  background: color-mix(in srgb, var(--mo-surface) 70%, #0c1a18);
+  color: #eef7f4;
 }
 
 :root[data-theme="dark"] .kpi-actions-trigger:hover,
 :root[data-theme="dark"] .kpi-actions-trigger[aria-expanded="true"] {
-  border-color: rgba(129, 140, 248, 0.4);
-  background: rgba(99, 102, 241, 0.16);
-  color: #e8eef9;
+  border-color: rgba(45, 212, 191, 0.45);
+  background: rgba(15, 118, 110, 0.28);
+  color: #eef7f4;
 }
 
 .kpi-actions-menu {

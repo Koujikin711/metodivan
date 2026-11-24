@@ -6,7 +6,7 @@ export function getStoredTheme(): ThemeMode {
   if (typeof window === "undefined") return "light";
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw === "dark" || raw === "light") return raw;
-  if (window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+  // CRM-DN: светлая teal-тема по умолчанию (не системный dark).
   return "light";
 }
 
@@ -46,5 +46,9 @@ export function toggleTheme(): ThemeMode {
 
 /** Вызывать до первого рендера React, чтобы не мигал светлый фон. */
 export function initTheme() {
+  if (typeof window !== "undefined" && !localStorage.getItem("mo-theme-crmdn-teal-v1")) {
+    localStorage.setItem(STORAGE_KEY, "light");
+    localStorage.setItem("mo-theme-crmdn-teal-v1", "1");
+  }
   applyTheme(getStoredTheme());
 }
