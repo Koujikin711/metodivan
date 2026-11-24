@@ -1,23 +1,26 @@
 import type { HTMLAttributes, ReactNode } from "react";
 
-/** Уникальный цвет на каждый вариант — без соседних оттенков одного семейства. */
+/**
+ * CRM-DN: один teal-семейный ряд вместо радуги MetodiOne.
+ * Logout/pink остаются приглушённым rose для «Выход».
+ */
 const variants = {
-  crm: "bg-[#E11D48]",
-  indigo: "bg-[#6366F1]",
-  purple: "bg-[#A855F7]",
-  finance: "bg-[#16A34A]",
-  tariff: "bg-[#14B8A6]",
-  online: "bg-[#2563EB]",
-  blue: "bg-[#3B82F6]",
-  analytics: "bg-[#0EA5E9]",
-  tasks: "bg-[#0891B2]",
-  chat: "bg-[#22D3EE]",
-  teal: "bg-[#2DD4BF]",
-  trainer: "bg-[#F97316]",
-  integrations: "bg-[#8B5CF6]",
-  platform: "bg-[#EAB308]",
-  logout: "bg-[#F43F5E]",
-  pink: "bg-[#EC4899]",
+  crm: "bg-[#0f766e]",
+  indigo: "bg-[#0d9488]",
+  purple: "bg-[#0f766e]",
+  finance: "bg-[#0f766e]",
+  tariff: "bg-[#14b8a6]",
+  online: "bg-[#115e59]",
+  blue: "bg-[#0d9488]",
+  analytics: "bg-[#0f766e]",
+  tasks: "bg-[#134e4a]",
+  chat: "bg-[#14b8a6]",
+  teal: "bg-[#0d9488]",
+  trainer: "bg-[#0f766e]",
+  integrations: "bg-[#115e59]",
+  platform: "bg-[#0d9488]",
+  logout: "bg-[#be123c]",
+  pink: "bg-[#be123c]",
 } as const;
 
 export type NavIconVariant = keyof typeof variants;
@@ -29,10 +32,8 @@ type Props = {
 } & HTMLAttributes<HTMLDivElement>;
 
 const darkInk: Partial<Record<NavIconVariant, true>> = {
-  platform: true,
-  chat: true,
-  teal: true,
   tariff: true,
+  chat: true,
 };
 
 export function NavIconBadge({ children, variant = "crm", className = "", ...rest }: Props) {
