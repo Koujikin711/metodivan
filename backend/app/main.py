@@ -1,6 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 import logging
+import re
 import socket
 import time
 from pathlib import Path
@@ -9,7 +10,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response as StarletteResponse
 
 from app.core.request_id_middleware import RequestIdMiddleware
 from sqlalchemy import select
@@ -459,13 +460,20 @@ LEAD_SOURCE_DEFAULTS = (
     "Вотсап",
     "Телеграм",
     "GREEN API",
-    "WHATSAPP",
+    "TIKTOK",
+    "GOOGLE SHEETS",
+)
+
+# Латинские дубли кириллических каналов + служебные IG MC/DM — не показываем в справочнике.
+LEAD_SOURCE_HIDE_NAMES = (
     "INSTAGRAM",
     "INSTAGRAM_DM",
     "INSTAGRAM MC",
-    "TIKTOK",
+    "Instagram",
+    "WHATSAPP",
+    "WhatsApp",
     "TELEGRAM",
-    "GOOGLE SHEETS",
+    "Telegram",
 )
 
 
@@ -474,6 +482,7 @@ async def seed_lead_sources_defaults() -> None:
         company_ids = list((await session.execute(select(Company.id))).scalars().all())
         if not company_ids:
             company_ids = [await _ensure_default_company(session)]
+        hide = set(LEAD_SOURCE_HIDE_NAMES)
         for cid in company_ids:
             existing = (
                 await session.execute(
@@ -488,6 +497,18 @@ async def seed_lead_sources_defaults() -> None:
                 if name in existing_names:
                     continue
                 session.add(LeadSource(name=name, is_active=True, company_id=int(cid)))
+            # Снять с витрины латинские дубли и INSTAGRAM MC/DM (лиды с этими source остаются).
+            junk = (
+                await session.execute(
+                    select(LeadSource).where(
+                        LeadSource.company_id == int(cid),
+                        LeadSource.name.in_(list(hide)),
+                        LeadSource.is_active.is_(True),
+                    ),
+                )
+            ).scalars().all()
+            for row in junk:
+                row.is_active = False
         await session.commit()
 
 
@@ -947,6 +968,37 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# API хранит UTC naive datetime; без «Z» браузер в Asia/Dushanbe читает как локаль (−5 ч).
+_NAIVE_ISO_DT = re.compile(r'"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?)"')
+
+
+@app.middleware("http")
+async def ensure_api_json_datetimes_utc_z(request: Request, call_next):  # type: ignore[no-untyped-def]
+    response = await call_next(request)
+    if request.method == "OPTIONS":
+        return response
+    if not request.url.path.startswith("/api/"):
+        return response
+    ctype = (response.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if ctype != "application/json":
+        return response
+    chunks: list[bytes] = []
+    async for chunk in response.body_iterator:
+        chunks.append(chunk if isinstance(chunk, (bytes, bytearray)) else str(chunk).encode("utf-8"))
+    body = b"".join(chunks)
+    headers = {k: v for k, v in response.headers.items() if k.lower() != "content-length"}
+    try:
+        text = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return StarletteResponse(content=body, status_code=response.status_code, headers=headers, media_type=ctype)
+    fixed = _NAIVE_ISO_DT.sub(r'"\1Z"', text)
+    return StarletteResponse(
+        content=fixed.encode("utf-8"),
+        status_code=response.status_code,
+        headers=headers,
+        media_type="application/json",
+    )
 
 
 @app.middleware("http")

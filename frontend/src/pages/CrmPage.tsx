@@ -25,6 +25,7 @@ import {
 import toast from "react-hot-toast";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
+import { APP_TIME_ZONE, parseApiDate } from "@/lib/apiDate";
 import { openLeadCard } from "@/lib/leadReturn";
 import { AccessDenied } from "@/components/AccessDenied";
 import { CrmToolbar } from "@/components/crm/CrmToolbar";
@@ -55,6 +56,20 @@ import type {
 
 /** Основные источники CRM-DN — всегда сверху в создании лида. */
 const CRM_DN_SOURCE_DEFAULTS = ["Инстаграм", "Фейсбук", "Вотсап"] as const;
+
+/** Латинские дубли + INSTAGRAM MC/DM — не показываем (оставляем кириллицу). */
+const CRM_DN_SOURCE_HIDDEN = new Set(
+  [
+    "INSTAGRAM",
+    "INSTAGRAM_DM",
+    "INSTAGRAM MC",
+    "Instagram",
+    "WHATSAPP",
+    "WhatsApp",
+    "TELEGRAM",
+    "Telegram",
+  ].map((n) => n.trim().toLowerCase()),
+);
 
 function stageDroppableId(stageId: number) {
   return `stage-${stageId}`;
@@ -93,7 +108,7 @@ function cloneDefaultStages(sales = false) {
   return src.map((s) => ({ name: s.name, color: s.color }));
 }
 
-const LEAD_CARD_TZ = "Asia/Dushanbe";
+const LEAD_CARD_TZ = APP_TIME_ZONE;
 
 function ymdInLeadTz(date: Date): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -107,9 +122,8 @@ function ymdInLeadTz(date: Date): string {
 /** Время на карточке: «Сегодня 12:58». При выдаче из архива — от даты выдачи. */
 function leadWhenLabel(createdAt?: string | null, reactivatedAt?: string | null): string {
   const iso = reactivatedAt || createdAt;
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  const d = parseApiDate(iso);
+  if (!d) return "—";
   const parts = new Intl.DateTimeFormat("ru-RU", {
     timeZone: LEAD_CARD_TZ,
     day: "numeric",
@@ -835,7 +849,9 @@ export function CrmPage() {
   });
 
   const createLeadSourceOptions = useMemo(() => {
-    const fromApi = (sourcesQuery.data ?? []).filter((s) => s.is_active);
+    const fromApi = (sourcesQuery.data ?? []).filter(
+      (s) => s.is_active && !CRM_DN_SOURCE_HIDDEN.has((s.name || "").trim().toLowerCase()),
+    );
     const names = new Set(fromApi.map((s) => s.name));
     const pinned: LeadSource[] = CRM_DN_SOURCE_DEFAULTS.filter((name) => !names.has(name)).map(
       (name, i) => ({ id: -1000 - i, name, is_active: true }),

@@ -10,6 +10,7 @@ import { WaitingCallbackModal } from "@/components/WaitingCallbackModal";
 import { useChatRealtime } from "@/hooks/useChatRealtime";
 import { useCurrentUserMe } from "@/hooks/useCurrentUserMe";
 import { apiFetch, getActiveCompanyId, getStoredToken, resolveApiUrl, resolveMediaUrl } from "@/lib/api";
+import { APP_TIME_ZONE, parseApiDate } from "@/lib/apiDate";
 import { decodeRoleFromToken } from "@/lib/auth";
 import {
   chatDraftPreview,
@@ -108,42 +109,48 @@ const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|bmp|svg|avif|heic|heif)(\?|#|$)/i;
 
 function localDateKey(raw: string | null | undefined): string {
   if (!raw) return "";
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return "";
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  const d = parseApiDate(raw);
+  if (!d) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
 
 function formatChatDateSeparator(raw: string | null | undefined): string {
   if (!raw) return "";
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return "";
+  const d = parseApiDate(raw);
+  if (!d) return "";
   const now = new Date();
   const msgKey = localDateKey(raw);
   const todayKey = localDateKey(now.toISOString());
   if (msgKey === todayKey) return "Сегодня";
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (msgKey === localDateKey(yesterday.toISOString())) return "Вчера";
+  const yesterdayKey = localDateKey(new Date(Date.now() - 86_400_000).toISOString());
+  if (msgKey === yesterdayKey) return "Вчера";
   try {
     const opts: Intl.DateTimeFormatOptions =
       d.getFullYear() === now.getFullYear()
-        ? { day: "numeric", month: "long" }
-        : { day: "numeric", month: "long", year: "numeric" };
+        ? { day: "numeric", month: "long", timeZone: APP_TIME_ZONE }
+        : { day: "numeric", month: "long", year: "numeric", timeZone: APP_TIME_ZONE };
     return new Intl.DateTimeFormat("ru-RU", opts).format(d);
   } catch {
-    return d.toLocaleDateString("ru-RU");
+    return d.toLocaleDateString("ru-RU", { timeZone: APP_TIME_ZONE });
   }
 }
 
 function formatChatTime(raw: string | null | undefined): string {
   if (!raw) return "";
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return "";
+  const d = parseApiDate(raw);
+  if (!d) return "";
   try {
-    return new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(d);
+    return new Intl.DateTimeFormat("ru-RU", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: APP_TIME_ZONE,
+    }).format(d);
   } catch {
     const hh = String(d.getHours()).padStart(2, "0");
     const mm = String(d.getMinutes()).padStart(2, "0");
