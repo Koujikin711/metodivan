@@ -169,6 +169,41 @@ export function EmployeesPage() {
     from_email: "",
     password: "",
   });
+  const applySmtpPreset = (kind: "gmail" | "mailru") => {
+    if (kind === "mailru") {
+      setSmtpDraft((s) => ({
+        ...s,
+        host: "smtp.mail.ru",
+        port: "465",
+        user: s.user.includes("@") ? s.user : s.user || "",
+        from_email: s.from_email || s.user,
+      }));
+      return;
+    }
+    setSmtpDraft((s) => ({
+      ...s,
+      host: "smtp.gmail.com",
+      port: "587",
+      user: s.user.includes("@") ? s.user : s.user || "",
+      from_email: s.from_email || s.user,
+    }));
+  };
+  const applySmtpDefaultsFromUser = (email: string) => {
+    const domain = email.split("@")[1]?.toLowerCase() || "";
+    if (["mail.ru", "inbox.ru", "list.ru", "bk.ru", "internet.ru"].includes(domain)) {
+      setSmtpDraft((s) => ({ ...s, user: email, host: "smtp.mail.ru", port: "465", from_email: s.from_email || email }));
+      return;
+    }
+    if (["gmail.com", "googlemail.com"].includes(domain)) {
+      setSmtpDraft((s) => ({ ...s, user: email, host: "smtp.gmail.com", port: "587", from_email: s.from_email || email }));
+      return;
+    }
+    if (["yandex.ru", "yandex.com", "ya.ru"].includes(domain)) {
+      setSmtpDraft((s) => ({ ...s, user: email, host: "smtp.yandex.ru", port: "465", from_email: s.from_email || email }));
+      return;
+    }
+    setSmtpDraft((s) => ({ ...s, user: email }));
+  };
   useEffect(() => {
     const d = smtpQuery.data;
     if (!d) return;
@@ -1049,7 +1084,7 @@ export function EmployeesPage() {
       <section className="mo-section p-5">
         <h2 className="lux-heading">SMTP / Почта</h2>
         <p className="mt-1 text-xs lux-caption">
-          Чтобы письма с паролем уходили сотрудникам, укажите Gmail и пароль приложения. WhatsApp при этом уже работает.
+          Письма с паролем сотрудникам: укажите ящик Gmail или Mail.ru и пароль, затем «Сохранить SMTP». WhatsApp уже работает отдельно.
         </p>
         {smtpQuery.isLoading && <p className="mt-2 text-sm lux-caption">Загрузка SMTP…</p>}
         {smtpQuery.isError && (
@@ -1062,17 +1097,25 @@ export function EmployeesPage() {
               {smtpQuery.data.source === "env"
                 ? "Amvera env"
                 : smtpQuery.data.source === "company_gmail"
-                  ? "сохранено в CRM (Gmail)"
+                  ? "сохранено в CRM (почта)"
                   : "не настроено"}
               {smtpQuery.data.has_password ? " · пароль задан" : " · пароль не задан"}
             </p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="btn-secondary" onClick={() => applySmtpPreset("gmail")}>
+                Gmail
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => applySmtpPreset("mailru")}>
+                Mail.ru
+              </button>
+            </div>
             <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
               HOST
               <input
                 className="mo-input"
                 value={smtpDraft.host}
                 onChange={(e) => setSmtpDraft((s) => ({ ...s, host: e.target.value }))}
-                placeholder="smtp.gmail.com"
+                placeholder="smtp.gmail.com или smtp.mail.ru"
               />
             </label>
             <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
@@ -1081,16 +1124,16 @@ export function EmployeesPage() {
                 className="mo-input"
                 value={smtpDraft.port}
                 onChange={(e) => setSmtpDraft((s) => ({ ...s, port: e.target.value }))}
-                placeholder="587"
+                placeholder="587 (Gmail) / 465 (Mail.ru)"
               />
             </label>
             <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
-              USER (Gmail)
+              USER (Gmail или Mail.ru)
               <input
                 className="mo-input"
                 value={smtpDraft.user}
-                onChange={(e) => setSmtpDraft((s) => ({ ...s, user: e.target.value }))}
-                placeholder="metoditj@gmail.com"
+                onChange={(e) => applySmtpDefaultsFromUser(e.target.value)}
+                placeholder="metoditj@gmail.com или name@mail.ru"
               />
             </label>
             <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
@@ -1099,17 +1142,17 @@ export function EmployeesPage() {
                 className="mo-input"
                 value={smtpDraft.from_email}
                 onChange={(e) => setSmtpDraft((s) => ({ ...s, from_email: e.target.value }))}
-                placeholder="metoditj@gmail.com"
+                placeholder="тот же email, с которого шлёте"
               />
             </label>
             <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
-              PASSWORD (пароль приложения Gmail)
+              PASSWORD (Gmail App Password или пароль Mail.ru)
               <input
                 type="password"
                 className="mo-input"
                 value={smtpDraft.password}
                 onChange={(e) => setSmtpDraft((s) => ({ ...s, password: e.target.value }))}
-                placeholder={smtpQuery.data.has_password ? "оставьте пустым, чтобы не менять" : "xxxx xxxx xxxx xxxx"}
+                placeholder={smtpQuery.data.has_password ? "оставьте пустым, чтобы не менять" : "пароль ящика"}
                 autoComplete="new-password"
               />
             </label>

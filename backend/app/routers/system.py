@@ -56,6 +56,18 @@ class DemoRequestBody(BaseModel):
     message: str | None = Field(default=None, max_length=2000)
 
 
+def _smtp_defaults_for_mailbox(email: str) -> tuple[str, int, str]:
+    """HOST, PORT, IMAP_HOST по домену ящика (Gmail / Mail.ru / Yandex)."""
+    domain = (email.rsplit("@", 1)[-1] if "@" in email else "").strip().lower()
+    if domain in {"mail.ru", "inbox.ru", "list.ru", "bk.ru", "internet.ru"}:
+        return "smtp.mail.ru", 465, "imap.mail.ru"
+    if domain in {"yandex.ru", "yandex.com", "ya.ru"}:
+        return "smtp.yandex.ru", 465, "imap.yandex.ru"
+    if domain in {"gmail.com", "googlemail.com"}:
+        return "smtp.gmail.com", 587, "imap.gmail.com"
+    return "smtp.gmail.com", 587, "imap.gmail.com"
+
+
 async def _resolve_smtp(db: AsyncSession, company_id: int) -> tuple[dict[str, Any], str]:
     """Env SMTP имеет приоритет; иначе Gmail-интеграция компании."""
     if (settings.smtp_host or "").strip():
@@ -75,10 +87,11 @@ async def _resolve_smtp(db: AsyncSession, company_id: int) -> tuple[dict[str, An
         email_addr = str(cfg.get("email") or cfg.get("gmail_email") or "").strip()
         app_password = str(cfg.get("app_password") or cfg.get("appPassword") or "").strip()
         if email_addr:
+            auto_host, auto_port, _auto_imap = _smtp_defaults_for_mailbox(email_addr)
             return (
                 {
-                    "smtp_host": str(cfg.get("smtp_host") or "smtp.gmail.com").strip() or "smtp.gmail.com",
-                    "smtp_port": int(cfg.get("smtp_port") or 587),
+                    "smtp_host": str(cfg.get("smtp_host") or auto_host).strip() or auto_host,
+                    "smtp_port": int(cfg.get("smtp_port") or auto_port),
                     "smtp_user": email_addr,
                     "smtp_password": app_password,
                     "smtp_from": str(cfg.get("from_email") or email_addr).strip() or email_addr,
@@ -138,8 +151,23 @@ async def patch_smtp_config(
     if "@" not in user:
         raise HTTPException(status_code=400, detail="Укажите email SMTP (USER)")
     from_email = (body.from_email or user).strip() or user
-    host = (body.host or "smtp.gmail.com").strip() or "smtp.gmail.com"
-    port = int(body.port or 587)
+    auto_host, auto_port, auto_imap = _smtp_defaults_for_mailbox(user)
+    raw_host = (body.host or "").strip()
+    # Если HOST пуст или «чужой» дефолт под другой провайдер — подставить по домену USER.
+    if not raw_host or raw_host in {"smtp.gmail.com", "smtp.mail.ru", "smtp.yandex.ru"}:
+        # Явный host от клиента оставляем, если совпадает с доменом или это не авто-переключение:
+        if not raw_host:
+            host = auto_host
+        elif raw_host == auto_host:
+            host = raw_host
+        else:
+            # Клиент выбрал пресет (Gmail/Mail.ru) — уважаем
+            host = raw_host
+    else:
+        host = raw_host
+    port = int(body.port or auto_port or 587)
+    if not body.port and host == auto_host:
+        port = auto_port
 
     integ = await get_gmail_integration(db, company_id)
     new_password = (body.password or "").strip()
@@ -147,7 +175,7 @@ async def patch_smtp_config(
         if not new_password:
             raise HTTPException(
                 status_code=400,
-                detail="Укажите пароль приложения Gmail (PASSWORD)",
+                detail="Укажите пароль: Gmail App Password или пароль ящика Mail.ru",
             )
         pipe = (
             await db.execute(
@@ -183,7 +211,10 @@ async def patch_smtp_config(
         if not new_password:
             new_password = str(old_cfg.get("app_password") or old_cfg.get("appPassword") or "").strip()
         if not new_password:
-            raise HTTPException(status_code=400, detail="Укажите пароль приложения Gmail (PASSWORD)")
+            raise HTTPException(
+                status_code=400,
+                detail="Укажите пароль: Gmail App Password или пароль ящика Mail.ru",
+            )
         integ.is_active = True
 
     integ.config = {
@@ -193,7 +224,7 @@ async def patch_smtp_config(
         "smtp_host": host,
         "smtp_port": port,
         "from_email": from_email,
-        "imap_host": "imap.gmail.com",
+        "imap_host": auto_imap,
     }
     flag_modified(integ, "config")
     await db.commit()

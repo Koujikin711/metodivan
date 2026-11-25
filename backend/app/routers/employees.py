@@ -360,9 +360,16 @@ async def _company_smtp_override(db: AsyncSession, company_id: int) -> dict[str,
     app_password = str(cfg.get("app_password") or cfg.get("appPassword") or "").strip()
     if not email_addr or not app_password:
         return None
+    domain = email_addr.rsplit("@", 1)[-1].lower()
+    if domain in {"mail.ru", "inbox.ru", "list.ru", "bk.ru", "internet.ru"}:
+        default_host, default_port = "smtp.mail.ru", 465
+    elif domain in {"yandex.ru", "yandex.com", "ya.ru"}:
+        default_host, default_port = "smtp.yandex.ru", 465
+    else:
+        default_host, default_port = "smtp.gmail.com", 587
     return {
-        "smtp_host": str(cfg.get("smtp_host") or "smtp.gmail.com").strip() or "smtp.gmail.com",
-        "smtp_port": int(cfg.get("smtp_port") or 587),
+        "smtp_host": str(cfg.get("smtp_host") or default_host).strip() or default_host,
+        "smtp_port": int(cfg.get("smtp_port") or default_port),
         "smtp_user": email_addr,
         "smtp_password": app_password,
         "smtp_from": str(cfg.get("from_email") or email_addr).strip() or email_addr,

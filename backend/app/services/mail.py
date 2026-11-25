@@ -19,11 +19,14 @@ def smtp_misconfig_hint(
     user = (smtp_user if smtp_user is not None else settings.smtp_user) or ""
     password = (smtp_password if smtp_password is not None else settings.smtp_password) or ""
     if not host.strip():
-        return "SMTP_HOST пуст на сервере Amvera (или подключите Gmail в Интеграциях)"
+        return (
+            "SMTP_HOST пуст — сохраните Gmail или Mail.ru в Сотрудники → SMTP "
+            "(или переменные Amvera / Интеграции)"
+        )
     if not user.strip():
         return "SMTP_USER пуст"
     if not password.strip():
-        return "SMTP_PASSWORD пуст (нужен пароль приложения Gmail)"
+        return "SMTP_PASSWORD пуст (пароль приложения Gmail или пароль ящика Mail.ru)"
     return None
 
 
@@ -106,7 +109,7 @@ def send_email(
         # Короткая подсказка без паролей
         low = err.lower()
         if "authentication" in low or "username and password" in low or "badcredentials" in low:
-            return False, "SMTP: неверный логин/пароль приложения Gmail"
+            return False, "SMTP: неверный логин/пароль (Gmail app password или пароль Mail.ru)"
         if "timed out" in low or "timeout" in low:
             return False, "SMTP: таймаут соединения с почтовым сервером"
         return False, f"SMTP: {err[:180]}"
