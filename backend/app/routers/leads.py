@@ -1286,6 +1286,16 @@ class LeadRedistributeBody(BaseModel):
     to_manager_ids: list[int] = Field(..., min_length=1)
 
 
+class LeadRedistributeEqualBody(BaseModel):
+    """Равномерно разложить лиды между указанными менеджерами (round-robin)."""
+
+    manager_ids: list[int] = Field(..., min_length=2)
+    include_unassigned: bool = Field(
+        default=False,
+        description="Также включить лиды без менеджера",
+    )
+
+
 class LeadRedistributeResult(BaseModel):
     total: int
     reassigned: int
@@ -1562,6 +1572,119 @@ async def redistribute_manager_leads(
         )
 
     return LeadRedistributeResult(total=total, reassigned=total, per_manager=per_manager)
+
+
+@router.post("/redistribute-equal", response_model=LeadRedistributeResult)
+async def redistribute_leads_equal_among_managers(
+    body: LeadRedistributeEqualBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: CurrentUser,
+    company_id: CurrentCompanyId,
+) -> LeadRedistributeResult:
+    """Равномерно раздать лиды между выбранными менеджерами (например Начиб + Муниса)."""
+    if not _is_lead_redistribution_admin(current_user.role):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Только владелец или админ воронки")
+
+    target_ids: list[int] = []
+    seen: set[int] = set()
+    for raw in body.manager_ids:
+        tid = int(raw)
+        if tid in seen:
+            continue
+        seen.add(tid)
+        await _load_redistribution_target(db, manager_id=tid, company_id=company_id)
+        target_ids.append(tid)
+    if len(target_ids) < 2:
+        raise HTTPException(status_code=400, detail="Нужны минимум два разных менеджера")
+
+    filters = [Lead.company_id == company_id]
+    if body.include_unassigned:
+        filters.append(or_(Lead.manager_id.in_(target_ids), Lead.manager_id.is_(None)))
+    else:
+        filters.append(Lead.manager_id.in_(target_ids))
+
+    lead_rows = (
+        await db.execute(
+            select(Lead.id, Lead.manager_id).where(*filters).order_by(Lead.id.asc()),
+        )
+    ).all()
+    if not lead_rows:
+        return LeadRedistributeResult(total=0, reassigned=0, per_manager={tid: 0 for tid in target_ids})
+
+    per_manager: dict[int, int] = {tid: 0 for tid in target_ids}
+    n_targets = len(target_ids)
+    total = len(lead_rows)
+    batch = await write_audit_event(
+        db,
+        entity_type="lead",
+        entity_id=0,
+        action="leads_redistributed_equal",
+        current_user=current_user,
+        details=f"targets={target_ids}, total={total}, per_manager={{}}",
+    )
+    batch_id = int(batch.id)
+
+    changed = 0
+    for i, (lead_id, from_mid) in enumerate(lead_rows):
+        new_mid = target_ids[i % n_targets]
+        old_mid = int(from_mid) if from_mid is not None else None
+        if old_mid == new_mid:
+            per_manager[new_mid] = per_manager.get(new_mid, 0) + 1
+            continue
+        lead = await db.get(Lead, int(lead_id))
+        if lead is None:
+            continue
+        if old_mid is not None:
+            await _freeze_booking_sellers_on_lead_reassign(
+                db,
+                company_id=company_id,
+                lead_id=int(lead_id),
+                from_manager_id=old_mid,
+            )
+        lead.manager_id = new_mid
+        per_manager[new_mid] = per_manager.get(new_mid, 0) + 1
+        changed += 1
+        await _audit_lead(
+            db,
+            lead_id=int(lead_id),
+            action="manager_reassigned",
+            current_user=current_user,
+            details=(
+                f"from_manager_id={old_mid}, to_manager_id={new_mid} "
+                f"(redistribute-equal), batch_id={batch_id}"
+            ),
+        )
+        if old_mid is not None:
+            await db.execute(
+                update(Task)
+                .where(
+                    Task.company_id == company_id,
+                    Task.related_lead_id == int(lead_id),
+                    Task.assigned_to == old_mid,
+                    Task.status.in_([TaskStatus.pending, TaskStatus.in_progress]),
+                )
+                .values(assigned_to=new_mid),
+            )
+
+    batch.details = (
+        f"targets={target_ids}, total={sum(per_manager.values())}, "
+        f"changed={changed}, per_manager={per_manager}"
+    )
+    await db.flush()
+    await db.commit()
+
+    for tid, cnt in per_manager.items():
+        if cnt <= 0:
+            continue
+        await _notify_users(
+            db,
+            company_id=company_id,
+            user_ids=[tid],
+            title="Лиды распределены поровну",
+            description=f"После равной раздачи у вас лидов: {cnt}.",
+        )
+
+    return LeadRedistributeResult(total=sum(per_manager.values()), reassigned=changed, per_manager=per_manager)
 
 
 @router.post("/redistribute-from-owners", response_model=LeadRedistributeResult)
