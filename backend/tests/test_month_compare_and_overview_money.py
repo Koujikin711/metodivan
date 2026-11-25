@@ -60,5 +60,22 @@ def test_month_compare_includes_kpi_protocol_payments():
     )
     proto = next(row for row in built["services"] if row["name"] == "Протокол")
     assert proto["revenue"][-1] == Decimal("17800.00")  # окт: запись 5800 + KPI 12000
-    assert proto["revenue"][-3] == Decimal("30000.00")  # авг: KPI
+    # Пустые июн–июл срезаны: авг — первый с данными (индекс 0).
+    assert built["labels"][0] == "авг"
+    assert proto["revenue"][0] == Decimal("30000.00")  # авг: KPI
     assert built["revenue"][-1] == Decimal("17800.00")
+
+
+def test_month_compare_trims_leading_empty_months():
+    """Если продажи только в ноябре — не рисуем пустые июн–окт."""
+    nov_cash = datetime(2026, 11, 10, tzinfo=UTC)
+    built = build_month_compare(
+        datetime(2026, 11, 1).date(),
+        [
+            (Decimal("7650"), "completed", nov_cash, nov_cash, "Интенсив"),
+        ],
+    )
+    assert built["labels"] == ["ноя"]
+    assert built["revenue"] == [Decimal("7650.00")]
+    assert built["sales"] == [1]
+    assert len(built["services"][0]["revenue"]) == 1

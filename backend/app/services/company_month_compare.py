@@ -119,6 +119,22 @@ def build_month_compare(year_month, visits: list[tuple]) -> dict:
             },
         )
 
+    # Убрать пустые месяцы слева: график с первого месяца с данными (выбранный всегда справа).
+    start_i = 0
+    for i in range(n - 1):  # last (selected) always kept
+        if revenue[i] > 0 or sales[i] > 0:
+            start_i = i
+            break
+        start_i = i + 1
+
+    if start_i > 0:
+        months = months[start_i:]
+        revenue = revenue[start_i:]
+        sales = sales[start_i:]
+        for row in services:
+            row["revenue"] = row["revenue"][start_i:]
+            row["sales"] = row["sales"][start_i:]
+
     return {
         "labels": month_labels(months),
         "revenue": [v.quantize(Decimal("0.01")) for v in revenue],

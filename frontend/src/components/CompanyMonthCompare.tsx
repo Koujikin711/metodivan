@@ -157,8 +157,8 @@ export function CompanyMonthCompare({
         <div>
           <h3 className="text-lg font-semibold text-[var(--mo-text)]">Сравнение с прошлыми месяцами</h3>
           <p className="mt-1 text-xs mo-muted">
-            Шесть месяцев до выбранного. Выручка — оплаты визитов по дате сдачи денег, как в карточке выше.
-            Количество — записи месяца без отмен.
+            С первого месяца с продажами до выбранного (пустые слева не показываем). Выручка — все
+            продажи по дате оплаты. Количество — записи месяца без отмен.
           </p>
         </div>
         <div className="inline-flex rounded-full border border-[var(--mo-border)] p-0.5" role="tablist" aria-label="Что показать">
@@ -183,7 +183,7 @@ export function CompanyMonthCompare({
         </div>
       </div>
 
-      {query.isLoading ? <p className="text-xs mo-muted">Считаем шесть месяцев…</p> : null}
+      {query.isLoading ? <p className="text-xs mo-muted">Считаем сравнение месяцев…</p> : null}
       {query.isError ? <p className="text-xs text-red-300">Не удалось собрать сравнение месяцев.</p> : null}
 
       {data ? (
@@ -230,11 +230,11 @@ export function CompanyMonthCompare({
             ) : (
               <section className="mo-chart-card">
                 <header className="mo-chart-card__head">
-                  <h3>Выручка визитов</h3>
+                  <h3>Выручка</h3>
                   <p>
                     {bars[last] && bars[prev]
                       ? `${bars[last].label} к ${bars[prev].label}: ${pctDelta(bars[last].revenue, bars[prev].revenue)}`
-                      : "Визиты + курсы/протоколы KPI по дате оплаты."}
+                      : "Визиты, курсы, интенсив — по дате оплаты."}
                   </p>
                 </header>
                 <div style={{ height: 280 }}>
@@ -344,7 +344,7 @@ export function CompanyMonthCompare({
                   );
                 })}
                 <tr className="kpi-matrix-row-highlight">
-                  <td className="py-2 pr-3 font-semibold">{byCount ? "Всего записей" : "Выручка визитов"}</td>
+                  <td className="py-2 pr-3 font-semibold">{byCount ? "Всего записей" : "Выручка"}</td>
                   {(byCount ? data.sales : data.revenue).map((value, i) => (
                     <td key={months[i] ?? i} className="py-2 pr-3 font-semibold tabular-nums">
                       {byCount ? value : shortMoney(Number(value))}
