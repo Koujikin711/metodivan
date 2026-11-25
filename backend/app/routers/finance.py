@@ -1,7 +1,9 @@
+import asyncio
+import logging
 from calendar import monthrange
 from collections import defaultdict
 from datetime import UTC, date, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -50,12 +52,31 @@ from app.services.finance_report_build import build_dds_report, build_opiu_repor
 from app.services.google_sheets_sync import _google_service_account_ready
 
 router = APIRouter(prefix="/finance", tags=["finance"])
+logger = logging.getLogger(__name__)
 
 
 def _assert_expenses_access(user) -> None:
     if can_access_expenses(user.role):
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Нет доступа к расходам")
+
+
+async def _push_expense_sheet_bg(company_id: int, external_key: str | None) -> None:
+    """Пуш в Google Sheets вне HTTP-запроса: иначе Amvera отдаёт пустой 500 при долгом Sheets."""
+    if not external_key:
+        return
+    try:
+        from app.database import AsyncSessionLocal
+        from app.services.google_sheets_osv_push import push_pending_osv_rows
+
+        async with AsyncSessionLocal() as db:
+            await asyncio.wait_for(
+                push_pending_osv_rows(db, company_id, only_key=external_key),
+                timeout=45.0,
+            )
+            await db.commit()
+    except Exception as exc:
+        logger.warning("osv expense push bg failed key=%s err=%s", external_key, exc)
 
 
 OWNER_EXPENSE_CONFIRM_FROM = Decimal("500")
@@ -776,14 +797,7 @@ async def create_expense(
     row.external_key = f"crm:expense:{row.id}"
     await db.flush()
     if row.expense_confirm != "pending":
-        try:
-            from app.services.google_sheets_osv_push import push_pending_osv_rows
-
-            await push_pending_osv_rows(db, company_id, only_key=row.external_key)
-        except Exception as exc:
-            import logging
-
-            logging.getLogger(__name__).warning("osv expense push failed: %s", exc)
+        asyncio.create_task(_push_expense_sheet_bg(company_id, row.external_key))
     await db.refresh(row)
     return FinanceOsvRowRead.model_validate(row)
 
@@ -809,14 +823,7 @@ async def confirm_expense(
     row.expense_confirmed_by_user_id = int(current_user.id)
     await db.flush()
     if confirmed:
-        try:
-            from app.services.google_sheets_osv_push import push_pending_osv_rows
-
-            await push_pending_osv_rows(db, company_id, only_key=row.external_key)
-        except Exception as exc:
-            import logging
-
-            logging.getLogger(__name__).warning("osv expense push failed: %s", exc)
+        asyncio.create_task(_push_expense_sheet_bg(company_id, row.external_key))
     await db.refresh(row)
     return FinanceOsvRowRead.model_validate(row)
 
@@ -845,7 +852,12 @@ async def update_expense(
         person = await db.get(User, body.employee_user_id)
         if person is None or person.company_id != company_id or not person.is_active:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Сотрудник не найден")
-    amount = Decimal(str(body.expense))
+    try:
+        amount = Decimal(str(body.expense))
+    except (InvalidOperation, ValueError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Некорректная сумма") from exc
+    if amount == 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Сумма не может быть 0")
     row.txn_date = body.txn_date
     row.expense = amount
     row.bank = _clean(body.bank)
@@ -870,13 +882,6 @@ async def update_expense(
         row.expense_confirmed_by_user_id = int(current_user.id)
     await db.flush()
     if row.expense_confirm != "rejected":
-        try:
-            from app.services.google_sheets_osv_push import push_pending_osv_rows
-
-            await push_pending_osv_rows(db, company_id, only_key=row.external_key)
-        except Exception as exc:
-            import logging
-
-            logging.getLogger(__name__).warning("osv expense push failed: %s", exc)
+        asyncio.create_task(_push_expense_sheet_bg(company_id, row.external_key))
     await db.refresh(row)
     return FinanceOsvRowRead.model_validate(row)

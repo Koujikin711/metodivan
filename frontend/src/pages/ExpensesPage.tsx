@@ -833,13 +833,17 @@ export function ExpensesPage() {
   );
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      apiFetch<ExpenseRow>("/api/finance/expenses", {
+    mutationFn: () => {
+      const amount = parseMoneyInput(expense);
+      if (!Number.isFinite(amount) || amount === 0) {
+        throw new Error("Укажите сумму расхода (не 0)");
+      }
+      return apiFetch<ExpenseRow>("/api/finance/expenses", {
         method: "POST",
-        timeoutMs: 60_000,
+        timeoutMs: 30_000,
         body: JSON.stringify({
           txn_date: txnDate,
-          expense: Number(expense),
+          expense: amount,
           bank: resolveCatalogValue(bank),
           article: resolveCatalogValue(article),
           brief_category: resolveCatalogValue(brief) || "Расход",
@@ -851,7 +855,8 @@ export function ExpensesPage() {
           phone: phone || null,
           via_person: viaPerson || null,
         }),
-      }),
+      });
+    },
     onSuccess: (row) => {
       toast.success(row.expense_confirm === "pending" ? "Ждёт подтверждения владельца" : "Расход сохранён");
       setExpense("");
@@ -863,7 +868,7 @@ export function ExpensesPage() {
       void qc.invalidateQueries({ queryKey: ["finance-expenses-pending"] });
       void qc.invalidateQueries({ queryKey: ["finance-payroll"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message || "Не удалось сохранить расход", { duration: 7000 }),
   });
   const confirmMutation = useMutation({
     mutationFn: (body: { id: number; confirmed: boolean }) =>
@@ -881,12 +886,20 @@ export function ExpensesPage() {
   const [editId, setEditId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<ExpenseDraft | null>(null);
   const updateMutation = useMutation({
-    mutationFn: (body: { id: number; draft: ExpenseDraft }) =>
-      apiFetch<ExpenseRow>(`/api/finance/expenses/${body.id}`, {
+    mutationFn: (body: { id: number; draft: ExpenseDraft }) => {
+      const amount = parseMoneyInput(body.draft.expense);
+      if (!Number.isFinite(amount) || amount === 0) {
+        throw new Error("Укажите сумму расхода (не 0)");
+      }
+      if (!body.draft.txn_date) {
+        throw new Error("Укажите дату");
+      }
+      return apiFetch<ExpenseRow>(`/api/finance/expenses/${body.id}`, {
         method: "PATCH",
+        timeoutMs: 30_000,
         body: JSON.stringify({
           txn_date: body.draft.txn_date,
-          expense: Number(String(body.draft.expense).replace(",", ".")),
+          expense: amount,
           bank: body.draft.bank || null,
           basis: body.draft.basis || null,
           counterparty: body.draft.counterparty || null,
@@ -899,7 +912,8 @@ export function ExpensesPage() {
           employee_user_id: body.draft.employee_user_id ? Number(body.draft.employee_user_id) : null,
           counts: body.draft.counts,
         }),
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Расход исправлен");
       setEditId(null);
@@ -908,7 +922,7 @@ export function ExpensesPage() {
       void qc.invalidateQueries({ queryKey: ["finance-expenses-pending"] });
       void qc.invalidateQueries({ queryKey: ["finance-payroll"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message || "Не удалось сохранить расход", { duration: 7000 }),
   });
   const openEdit = (row: ExpenseRow) => {
     setEditId(row.id);
