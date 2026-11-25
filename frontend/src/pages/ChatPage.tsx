@@ -1165,6 +1165,8 @@ export function ChatPage() {
       return apiFetch<ChatMessage>(`/api/chat/threads/${threadId}/messages`, {
         method: "POST",
         body: JSON.stringify({ text }),
+        // Бэкенд: Green ≤12с + быстрый отказ QR; не держать кнопку 45с.
+        timeoutMs: 20_000,
       });
     },
     onSuccess: () => {
@@ -1172,9 +1174,10 @@ export function ChatPage() {
       if (threadId != null) clearChatDraft(threadId);
       setPendingFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
+      // Сначала лента текущего чата; список диалогов — следом (не блокирует ввод).
       void qc.invalidateQueries({ queryKey: ["chat-messages", threadId] });
-      void qc.invalidateQueries({ queryKey: ["chat-threads"] });
       void qc.invalidateQueries({ queryKey: ["chat-thread", threadId] });
+      void qc.invalidateQueries({ queryKey: ["chat-threads"] });
       void qc.invalidateQueries({ queryKey: ["chat-thread-bucket-counts"] });
     },
     onError: (e: Error) => toast.error(e.message || "Не удалось отправить", { duration: 7000 }),

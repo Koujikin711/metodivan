@@ -16,6 +16,21 @@ from app.services.green_api_settings import green_api_base_from_config, green_me
 logger = logging.getLogger(__name__)
 
 
+def _qr_bridge_ready() -> tuple[bool, str]:
+    """Быстрый статус QR-моста: не ready → не ждём 20с на /send."""
+    from app.services.wa_bridge_client import fetch_status
+
+    st = fetch_status()
+    if st.get("ready"):
+        return True, ""
+    state = str(st.get("connectionState") or "DOWN")
+    err = str(st.get("error") or "").strip()
+    hint = f"WhatsApp QR не подключён ({state})"
+    if err:
+        hint = f"{hint}: {err[:120]}"
+    return False, hint
+
+
 def _via_qr_file(
     chat_id: str,
     file_bytes: bytes,
@@ -25,6 +40,10 @@ def _via_qr_file(
     green_error: str,
 ) -> tuple[bool, str | None, str | None]:
     from app.services.wa_bridge_client import send_file
+
+    ready, qr_hint = _qr_bridge_ready()
+    if not ready:
+        return False, _combine_send_errors(green_error, qr_hint), None
 
     ok, err, mid, down = send_file(chat_id, file_bytes, filename, caption, mime=mime)
     if ok:
@@ -87,12 +106,16 @@ def _via_qr_text(chat_id: str, text: str, green_error: str) -> tuple[bool, str |
     """Если Green API молчит, то же сообщение уходит через QR-сессию Baileys."""
     from app.services.wa_bridge_client import send_text
 
+    ready, qr_hint = _qr_bridge_ready()
+    if not ready:
+        # Раньше тут ждали до 20с на мёртвый /send — кнопка «Отправка…» зависала.
+        return False, _combine_send_errors(green_error, qr_hint), None
+
     ok, err, mid, down = send_text(chat_id, text)
     if ok:
         return True, None, mid
     if down:
-        qr_hint = err or "WhatsApp QR не подключён"
-        return False, _combine_send_errors(green_error, qr_hint), None
+        return False, _combine_send_errors(green_error, err or "WhatsApp QR не подключён"), None
     return False, _combine_send_errors(err, green_error), None
 
 
@@ -107,7 +130,8 @@ def send_green_text(config: dict | None, chat_id: str, text: str) -> tuple[bool,
     body = json.dumps({"chatId": chat_id, "message": text}).encode("utf-8")
     req = urlrequest.Request(url, data=body, method="POST", headers={"Content-Type": "application/json"})
     try:
-        with urlrequest.urlopen(req, timeout=25) as resp:
+        # Успех обычно 1–3с; 12с — потолок, дальше fail-fast + QR (если ready).
+        with urlrequest.urlopen(req, timeout=12) as resp:
             raw = resp.read().decode("utf-8") if resp else ""
             data = json.loads(raw) if raw else {}
             ok, err, mid = _green_success_or_error(data, raw)
@@ -131,8 +155,8 @@ async def send_green_text_async(config: dict | None, chat_id: str, text: str) ->
     url = f"{base}/waInstance{instance_id}/sendMessage/{api_token}"
     body: dict[str, Any] = {"chatId": chat_id, "message": text}
     try:
-        # Короче 40с: иначе кнопка «висит», а при таймауте str(ReadTimeout) бывает пустым.
-        async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=8.0)) as client:
+        # Не 25–40с: иначе UI «висит». Успех ~2с; при таймауте сразу явная ошибка.
+        async with httpx.AsyncClient(timeout=httpx.Timeout(12.0, connect=5.0)) as client:
             r = await client.post(url, json=body)
             if r.status_code >= 400:
                 return _via_qr_text(chat_id, text, _green_http_error_detail(r.status_code, r.text))

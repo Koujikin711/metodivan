@@ -117,7 +117,8 @@ def _post(path: str, payload: dict[str, Any], timeout: float) -> tuple[bool, str
 def send_text(chat_id: str, text: str) -> tuple[bool, str | None, str | None, bool]:
     if not (text or "").strip():
         return False, "Пустое сообщение", None, False
-    return _post("/send", {"chatId": chat_id, "message": text}, 20)
+    # Короткий таймаут: вызывающий код уже проверил ready; 20с слишком долго для UI.
+    return _post("/send", {"chatId": chat_id, "message": text}, 8)
 
 
 def send_file(
