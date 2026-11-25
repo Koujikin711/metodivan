@@ -8,6 +8,7 @@ import { DateField } from "@/components/DateField";
 import { PrintButton } from "@/components/PrintButton";
 import { Search } from "@/components/icons";
 import { apiFetch } from "@/lib/api";
+import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
 import type { Pipeline } from "@/lib/types";
 
 /** Порядок: Дашборд → Распределение → Статистика → Аналитика → Отчёт → Прогноз; поиск — иконка у печати. */
@@ -121,7 +122,7 @@ export function RopLayout() {
             >
               {pipelines.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name}
+                  {pipelineDisplayName(p.name)}
                 </option>
               ))}
             </select>

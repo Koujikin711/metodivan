@@ -6,6 +6,7 @@ import { MonthYearPicker } from "@/components/MonthYearPicker";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { apiFetch } from "@/lib/api";
 import { formatMoney } from "@/lib/money";
+import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
 import type { SalesKpiCompanyReport, SalesKpiPipelineMeta } from "@/lib/types";
 
 function defaultYearMonth() {
@@ -71,7 +72,7 @@ export function AccountantCompanyFinance() {
           >
             {(pipelinesQuery.data ?? []).map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
+                {pipelineDisplayName(p.name)}
               </option>
             ))}
           </select>

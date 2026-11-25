@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { Link, useNavigate } from "react-router-dom";
 
 import { apiFetch } from "@/lib/api";
+import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
 import { useCurrentUserMe } from "@/hooks/useCurrentUserMe";
 import type { ManagerDeskSale, Pipeline } from "@/lib/types";
 import { ActivitySphereField } from "@/components/ActivitySphereField";
@@ -529,7 +530,7 @@ export function SalesQuoteCalculatorPage() {
                     <option value="">Авто</option>
                     {(pipelinesQuery.data ?? []).map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name}
+                        {pipelineDisplayName(p.name)}
                       </option>
                     ))}
                   </select>

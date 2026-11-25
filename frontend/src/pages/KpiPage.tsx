@@ -22,6 +22,7 @@ import { useCurrentUserMe } from "@/hooks/useCurrentUserMe";
 import { apiFetch, getStoredToken } from "@/lib/api";
 import { decodeRoleFromToken } from "@/lib/auth";
 import { formatMoney } from "@/lib/money";
+import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
 import type {
   Lead,
   SalesKpiCompanyReport,
@@ -1548,7 +1549,7 @@ export function KpiPage() {
           >
             {(pipelinesQuery.data ?? []).map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
+                {pipelineDisplayName(p.name)}
               </option>
             ))}
           </select>

@@ -5,6 +5,7 @@ import { DateField } from "@/components/DateField";
 import { PrintButton } from "@/components/PrintButton";
 import { PrintMasthead, PrintSign, printPeriod } from "@/components/PrintMasthead";
 import { apiFetch } from "@/lib/api";
+import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
 import type { ExpertReportsResponse } from "@/lib/types";
 
 export function ExpertReportsPage() {
@@ -84,7 +85,7 @@ export function ExpertReportsPage() {
           className="mo-section p-5 shadow-inner"
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="lux-subheading">{p.pipeline_name}</h2>
+            <h2 className="lux-subheading">{pipelineDisplayName(p.pipeline_name)}</h2>
             <div className="flex flex-wrap gap-3 text-sm mo-muted">
               <span>
                 <span className="mo-muted">Записано:</span> {p.patients_booked}

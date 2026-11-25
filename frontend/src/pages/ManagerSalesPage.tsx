@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { ActivitySphereField } from "@/components/ActivitySphereField";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { apiFetch } from "@/lib/api";
+import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
 import { useCurrentUserMe } from "@/hooks/useCurrentUserMe";
 import type { ManagerDeskSale, Pipeline } from "@/lib/types";
 
@@ -202,7 +203,7 @@ export function ManagerSalesPage() {
                   <option value="">Авто</option>
                   {pipelines.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}
+                      {pipelineDisplayName(p.name)}
                     </option>
                   ))}
                 </select>

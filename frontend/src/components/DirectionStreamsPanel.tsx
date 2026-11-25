@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
 import { apiFetch } from "@/lib/api";
+import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
 import type { BookingDirection } from "@/lib/types";
 
 /** CRM-DN продукты записи (вместо клинических «потоков курсов»). */
@@ -174,7 +175,7 @@ export function DirectionStreamsPanel() {
             <option value="">—</option>
             {(pipelinesQ.data ?? []).map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name === "Sales funnel" ? "Маркетинг" : p.name}
+                {pipelineDisplayName(p.name)}
               </option>
             ))}
           </select>

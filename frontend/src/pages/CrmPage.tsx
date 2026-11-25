@@ -34,6 +34,7 @@ import { PatientPhone } from "@/components/PatientPhone";
 import { QueryErrorNotice } from "@/components/QueryErrorNotice";
 import { WaitingCallbackModal } from "@/components/WaitingCallbackModal";
 import { apiDownloadBlob, apiFetch, getStoredToken, resolveApiUrl } from "@/lib/api";
+import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
 import { isRefusalStageName, leadStageChips } from "@/lib/leadStageChips";
 import { formatCompactCount } from "@/lib/money";
 import { theme } from "@/lib/theme";
@@ -2632,7 +2633,7 @@ export function CrmPage() {
                 >
                   {(pipelinesQuery.data ?? []).map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}
+                      {pipelineDisplayName(p.name)}
                     </option>
                   ))}
                 </select>
@@ -2848,7 +2849,7 @@ export function CrmPage() {
                   >
                     {(pipelinesQuery.data ?? []).map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name}
+                        {pipelineDisplayName(p.name)}
                       </option>
                     ))}
                   </select>
@@ -2931,7 +2932,7 @@ export function CrmPage() {
                   >
                     {(pipelinesQuery.data ?? []).map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name}
+                        {pipelineDisplayName(p.name)}
                       </option>
                     ))}
                   </select>

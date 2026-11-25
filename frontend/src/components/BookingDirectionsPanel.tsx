@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 
 import { Pencil, Plus, Trash2 } from "@/components/icons";
 import { apiFetch } from "@/lib/api";
+import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
 import { isAdminOnlyBookingDirectionName, isHiddenBookingDirectionName } from "@/lib/bookingDirectionKinds";
 import type { BookingDirection, Pipeline } from "@/lib/types";
 
@@ -253,7 +254,7 @@ export function BookingDirectionsPanel({
                 <option value="">— выберите —</option>
                 {pipelines.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name}
+                    {pipelineDisplayName(p.name)}
                   </option>
                 ))}
               </select>
@@ -318,7 +319,7 @@ export function BookingDirectionsPanel({
                         <option value="">— выберите —</option>
                         {pipelines.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.name}
+                            {pipelineDisplayName(p.name)}
                           </option>
                         ))}
                       </select>
@@ -350,7 +351,7 @@ export function BookingDirectionsPanel({
                     <p className="truncate text-sm font-semibold text-[var(--mo-text)]">{d.name}</p>
                     <p className="text-[11px] mo-muted">
                       {d.duration_min} мин
-                      {d.pipeline_name ? ` · ${d.pipeline_name}` : ""}
+                      {d.pipeline_name ? ` · ${pipelineDisplayName(d.pipeline_name)}` : ""}
                       {!d.is_active ? " · архив" : ""}
                       {courseLocked ? " · только админ" : ""}
                     </p>

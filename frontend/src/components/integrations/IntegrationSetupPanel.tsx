@@ -3,6 +3,7 @@ import { useEffect, useState, type ComponentType } from "react";
 import toast from "react-hot-toast";
 
 import { apiFetch } from "@/lib/api";
+import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
 import { WaQrConnectPanel } from "@/components/integrations/WaQrConnectPanel";
 import type { GreenBroadcastPreviewRead, GreenBroadcastResult, Integration, Pipeline, PipelineStage } from "@/lib/types";
 
@@ -1020,7 +1021,7 @@ export function IntegrationSetupPanel() {
                     >
                       {(pipelinesQuery.data ?? []).map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.name}
+                          {pipelineDisplayName(p.name)}
                         </option>
                       ))}
                     </select>

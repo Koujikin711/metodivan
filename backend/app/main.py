@@ -251,7 +251,7 @@ async def seed_pipelines_and_stages() -> None:
         if any_pipeline is not None:
             return
 
-        pipe = Pipeline(name="Основная", type="sales", company_id=cid)
+        pipe = Pipeline(name="Маркетинг", type="sales", company_id=cid)
         session.add(pipe)
         await session.flush()
 
@@ -555,7 +555,7 @@ async def _seed_sales_crm_space_inner() -> None:
             )
         ).scalars().first()
         if pipe is None:
-            pipe = Pipeline(name="Основная", type="sales", company_id=cid)
+            pipe = Pipeline(name="Маркетинг", type="sales", company_id=cid)
             session.add(pipe)
             await session.flush()
             for st in default_pipeline_stage_creates(crm_mode="sales"):
@@ -744,6 +744,14 @@ async def _run_startup_db_and_seed() -> None:
         await ensure_crm_dn_sales_plan_items()
     except Exception:
         logger.exception("ensure_crm_dn_sales_plan_items failed; continuing startup")
+    try:
+        from app.services.ensure_crm_dn_pipeline_marketing_name import (
+            ensure_crm_dn_pipeline_marketing_name,
+        )
+
+        await ensure_crm_dn_pipeline_marketing_name()
+    except Exception:
+        logger.exception("ensure_crm_dn_pipeline_marketing_name failed; continuing startup")
 
 
 @asynccontextmanager

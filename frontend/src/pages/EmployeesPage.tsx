@@ -6,6 +6,7 @@ import { TerminateWithLeadsWizard } from "@/components/TerminateWithLeadsWizard"
 import { Pencil } from "@/components/icons";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { apiFetch, getStoredToken } from "@/lib/api";
+import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
 import { decodeUserIdFromToken } from "@/lib/auth";
 import { CRM_DN_DEFAULT_SPECIALTY, CRM_DN_SPECIALTY_SUGGESTIONS } from "@/lib/crmDnSpecialties";
 import type { Pipeline, UserRole } from "@/lib/types";
@@ -1408,7 +1409,7 @@ export function EmployeesPage() {
                           checked={editPipelineIds.includes(p.id)}
                           onChange={() => toggleEditPipeline(p.id)}
                         />
-                        <span className="truncate">{p.name}</span>
+                        <span className="truncate">{pipelineDisplayName(p.name)}</span>
                       </label>
                     ))}
                     {pipelines.length === 0 && <div className="text-sm mo-muted">Нет воронок</div>}
@@ -1616,7 +1617,7 @@ export function EmployeesPage() {
                         checked={pipelineIds.includes(p.id)}
                         onChange={() => togglePipeline(p.id)}
                       />
-                      <span className="truncate">{p.name}</span>
+                      <span className="truncate">{pipelineDisplayName(p.name)}</span>
                     </label>
                   ))}
                   {pipelines.length === 0 && <div className="text-sm mo-muted">Нет воронок</div>}

@@ -9,6 +9,7 @@ import {
 } from "@/lib/analyticsServiceGroups";
 import { appLexicon } from "@/lib/appLexicon";
 import { formatMoney } from "@/lib/money";
+import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
 import { AnalyticsServicesCharts } from "@/components/analytics/AnalyticsServicesCharts";
 import { AnalyticsPatientsLtvPanel } from "@/components/AnalyticsPatientsLtvPanel";
 import { DateField } from "@/components/DateField";
@@ -1046,7 +1047,7 @@ export function AnalyticsPage() {
                   <tbody>
                     {fullQuery.data.by_pipeline.map((r) => (
                       <tr key={`${r.pipeline_id ?? "none"}-${r.pipeline_name}`}>
-                        <td className="py-2.5 pr-4 font-medium">{r.pipeline_name}</td>
+                        <td className="py-2.5 pr-4 font-medium">{pipelineDisplayName(r.pipeline_name)}</td>
                         <td className="py-2.5 pr-4 tabular-nums">{r.leads_count}</td>
                         <td className="py-2.5 pr-4 tabular-nums">{r.processed_by_manager_count}</td>
                         <td className="py-2.5 pr-4 tabular-nums">{moneyFmt.format(Number(r.received_amount))}</td>
