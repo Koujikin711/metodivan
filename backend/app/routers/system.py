@@ -1,15 +1,19 @@
-from typing import Annotated
+import secrets
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.config import settings
 from app.services.chief_expert_access import assert_owner_admin_or_chief_expert
 from app.core.deps import CurrentCompanyId, CurrentUser
 from app.database import get_db
-from app.models import Company, TariffPlan, UserRole
+from app.models import Company, Integration, IntegrationProvider, Pipeline, PipelineStage, TariffPlan, UserRole
 from app.services.background_events import list_background_events
+from app.services.finance_integrate import get_gmail_integration
 from app.services.mail import send_email
 from app.services.demo_provision import provision_demo_account
 from app.schemas.email_types import RelaxedEmailStr
@@ -26,6 +30,19 @@ class SmtpConfigRead(BaseModel):
     has_password: bool
     public_app_url: str
     public_api_base_url: str
+    source: str = Field(description="env | company_gmail | none")
+
+
+class SmtpConfigPatch(BaseModel):
+    host: str = Field(default="smtp.gmail.com", max_length=255)
+    port: int = Field(default=587, ge=1, le=65535)
+    user: str = Field(..., min_length=3, max_length=320)
+    from_email: str | None = Field(default=None, max_length=320)
+    password: str | None = Field(
+        default=None,
+        max_length=256,
+        description="Пароль приложения Gmail. Пусто = оставить прежний.",
+    )
 
 
 class SmtpTestBody(BaseModel):
@@ -39,35 +56,189 @@ class DemoRequestBody(BaseModel):
     message: str | None = Field(default=None, max_length=2000)
 
 
+async def _resolve_smtp(db: AsyncSession, company_id: int) -> tuple[dict[str, Any], str]:
+    """Env SMTP имеет приоритет; иначе Gmail-интеграция компании."""
+    if (settings.smtp_host or "").strip():
+        return (
+            {
+                "smtp_host": (settings.smtp_host or "").strip(),
+                "smtp_port": int(settings.smtp_port or 587),
+                "smtp_user": (settings.smtp_user or "").strip(),
+                "smtp_password": (settings.smtp_password or "").strip(),
+                "smtp_from": (settings.smtp_from or settings.smtp_user or "").strip(),
+            },
+            "env",
+        )
+    integ = await get_gmail_integration(db, company_id)
+    if integ is not None and isinstance(integ.config, dict):
+        cfg = integ.config
+        email_addr = str(cfg.get("email") or cfg.get("gmail_email") or "").strip()
+        app_password = str(cfg.get("app_password") or cfg.get("appPassword") or "").strip()
+        if email_addr:
+            return (
+                {
+                    "smtp_host": str(cfg.get("smtp_host") or "smtp.gmail.com").strip() or "smtp.gmail.com",
+                    "smtp_port": int(cfg.get("smtp_port") or 587),
+                    "smtp_user": email_addr,
+                    "smtp_password": app_password,
+                    "smtp_from": str(cfg.get("from_email") or email_addr).strip() or email_addr,
+                },
+                "company_gmail",
+            )
+    return (
+        {
+            "smtp_host": "",
+            "smtp_port": int(settings.smtp_port or 587),
+            "smtp_user": "",
+            "smtp_password": "",
+            "smtp_from": (settings.smtp_from or "").strip(),
+        },
+        "none",
+    )
+
+
 @router.get("/smtp", response_model=SmtpConfigRead)
-async def smtp_config(current_user: CurrentUser) -> SmtpConfigRead:
+async def smtp_config(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: CurrentUser,
+    company_id: CurrentCompanyId,
+) -> SmtpConfigRead:
     if current_user.role != UserRole.owner:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Только владелец")
+    creds, source = await _resolve_smtp(db, company_id)
     return SmtpConfigRead(
-        host=settings.smtp_host,
-        port=settings.smtp_port,
-        user=settings.smtp_user,
-        from_email=settings.smtp_from,
-        has_password=bool(settings.smtp_password),
+        host=str(creds.get("smtp_host") or ""),
+        port=int(creds.get("smtp_port") or 587),
+        user=str(creds.get("smtp_user") or ""),
+        from_email=str(creds.get("smtp_from") or settings.smtp_from or ""),
+        has_password=bool(str(creds.get("smtp_password") or "").strip()),
         public_app_url=settings.public_app_url,
         public_api_base_url=settings.public_api_base_url,
+        source=source,
+    )
+
+
+@router.patch("/smtp", response_model=SmtpConfigRead)
+async def patch_smtp_config(
+    body: SmtpConfigPatch,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: CurrentUser,
+    company_id: CurrentCompanyId,
+) -> SmtpConfigRead:
+    """Сохранить SMTP компании (Gmail app password) — письма приглашений без Amvera env."""
+    if current_user.role != UserRole.owner:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Только владелец")
+    if (settings.smtp_host or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="SMTP задан в переменных Amvera (env). Меняйте там или очистите SMTP_HOST.",
+        )
+
+    user = body.user.strip().lower()
+    if "@" not in user:
+        raise HTTPException(status_code=400, detail="Укажите email SMTP (USER)")
+    from_email = (body.from_email or user).strip() or user
+    host = (body.host or "smtp.gmail.com").strip() or "smtp.gmail.com"
+    port = int(body.port or 587)
+
+    integ = await get_gmail_integration(db, company_id)
+    new_password = (body.password or "").strip()
+    if integ is None:
+        if not new_password:
+            raise HTTPException(
+                status_code=400,
+                detail="Укажите пароль приложения Gmail (PASSWORD)",
+            )
+        pipe = (
+            await db.execute(
+                select(Pipeline).where(Pipeline.company_id == company_id).order_by(Pipeline.id.asc()).limit(1)
+            )
+        ).scalars().first()
+        if pipe is None:
+            raise HTTPException(status_code=400, detail="Сначала создайте воронку в CRM")
+        stage = (
+            await db.execute(
+                select(PipelineStage)
+                .where(PipelineStage.pipeline_id == pipe.id)
+                .order_by(PipelineStage.order.asc(), PipelineStage.id.asc())
+                .limit(1)
+            )
+        ).scalars().first()
+        if stage is None:
+            raise HTTPException(status_code=400, detail="В воронке нет стадий")
+        integ = Integration(
+            company_id=company_id,
+            name="Gmail SMTP",
+            provider=IntegrationProvider.gmail,
+            is_active=True,
+            pipeline_id=int(pipe.id),
+            stage_id=int(stage.id),
+            secret=secrets.token_urlsafe(24),
+            config={},
+        )
+        db.add(integ)
+        await db.flush()
+    else:
+        old_cfg = integ.config if isinstance(integ.config, dict) else {}
+        if not new_password:
+            new_password = str(old_cfg.get("app_password") or old_cfg.get("appPassword") or "").strip()
+        if not new_password:
+            raise HTTPException(status_code=400, detail="Укажите пароль приложения Gmail (PASSWORD)")
+        integ.is_active = True
+
+    integ.config = {
+        "email": user,
+        "gmail_email": user,
+        "app_password": new_password,
+        "smtp_host": host,
+        "smtp_port": port,
+        "from_email": from_email,
+        "imap_host": "imap.gmail.com",
+    }
+    flag_modified(integ, "config")
+    await db.commit()
+    creds, source = await _resolve_smtp(db, company_id)
+    return SmtpConfigRead(
+        host=str(creds.get("smtp_host") or ""),
+        port=int(creds.get("smtp_port") or 587),
+        user=str(creds.get("smtp_user") or ""),
+        from_email=str(creds.get("smtp_from") or ""),
+        has_password=bool(str(creds.get("smtp_password") or "").strip()),
+        public_app_url=settings.public_app_url,
+        public_api_base_url=settings.public_api_base_url,
+        source=source,
     )
 
 
 @router.post("/smtp/test")
-async def smtp_test(body: SmtpTestBody, current_user: CurrentUser) -> dict:
+async def smtp_test(
+    body: SmtpTestBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: CurrentUser,
+    company_id: CurrentCompanyId,
+) -> dict:
     if current_user.role != UserRole.owner:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Только владелец")
+    creds, _source = await _resolve_smtp(db, company_id)
+    host = str(creds.get("smtp_host") or "").strip() or None
+    user = str(creds.get("smtp_user") or "").strip() or None
+    password = str(creds.get("smtp_password") or "").strip() or None
+    from_addr = str(creds.get("smtp_from") or "").strip() or None
     ok, mail_err = send_email(
         body.to_email.strip(),
-        "CRM SMTP test",
-        "Тестовое письмо CRM: SMTP настроен корректно.",
+        "CRM-DN SMTP test",
+        "Тестовое письмо CRM-DN: SMTP настроен корректно.",
+        smtp_host=host,
+        smtp_port=int(creds.get("smtp_port") or 587),
+        smtp_user=user,
+        smtp_password=password,
+        smtp_from=from_addr,
     )
     if not ok:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=mail_err
-            or "SMTP test failed. Check SMTP_HOST/PORT/USER/PASSWORD/FROM and server network access.",
+            or "SMTP test failed. Check HOST/PORT/USER/PASSWORD/FROM.",
         )
     return {"ok": True}
 

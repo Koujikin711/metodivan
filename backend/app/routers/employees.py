@@ -365,7 +365,7 @@ async def _company_smtp_override(db: AsyncSession, company_id: int) -> dict[str,
         "smtp_port": int(cfg.get("smtp_port") or 587),
         "smtp_user": email_addr,
         "smtp_password": app_password,
-        "smtp_from": email_addr,
+        "smtp_from": str(cfg.get("from_email") or email_addr).strip() or email_addr,
     }
 
 

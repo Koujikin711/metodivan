@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
 import { TerminateWithLeadsWizard } from "@/components/TerminateWithLeadsWizard";
@@ -44,6 +44,7 @@ interface SmtpConfig {
   has_password: boolean;
   public_app_url: string;
   public_api_base_url: string;
+  source?: string;
 }
 
 interface RedistributionSource {
@@ -161,6 +162,43 @@ export function EmployeesPage() {
     queryFn: () => apiFetch<SmtpConfig>("/api/system/smtp"),
   });
   const [smtpTestEmail, setSmtpTestEmail] = useState("");
+  const [smtpDraft, setSmtpDraft] = useState({
+    host: "smtp.gmail.com",
+    port: "587",
+    user: "",
+    from_email: "",
+    password: "",
+  });
+  useEffect(() => {
+    const d = smtpQuery.data;
+    if (!d) return;
+    setSmtpDraft((prev) => ({
+      host: d.host || "smtp.gmail.com",
+      port: String(d.port || 587),
+      user: d.user || "",
+      from_email: d.from_email || "",
+      password: prev.password,
+    }));
+  }, [smtpQuery.data]);
+  const smtpSaveMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<SmtpConfig>("/api/system/smtp", {
+        method: "PATCH",
+        body: JSON.stringify({
+          host: smtpDraft.host.trim() || "smtp.gmail.com",
+          port: Number(smtpDraft.port) || 587,
+          user: smtpDraft.user.trim(),
+          from_email: smtpDraft.from_email.trim() || null,
+          password: smtpDraft.password.trim() || null,
+        }),
+      }),
+    onSuccess: () => {
+      toast.success("SMTP сохранён — письма приглашений пойдут с этого ящика");
+      setSmtpDraft((s) => ({ ...s, password: "" }));
+      void qc.invalidateQueries({ queryKey: ["smtp-config"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const smtpTestMutation = useMutation({
     mutationFn: () =>
       apiFetch<{ ok: true }>("/api/system/smtp/test", {
@@ -1010,35 +1048,80 @@ export function EmployeesPage() {
 
       <section className="mo-section p-5">
         <h2 className="lux-heading">SMTP / Почта</h2>
+        <p className="mt-1 text-xs lux-caption">
+          Чтобы письма с паролем уходили сотрудникам, укажите Gmail и пароль приложения. WhatsApp при этом уже работает.
+        </p>
         {smtpQuery.isLoading && <p className="mt-2 text-sm lux-caption">Загрузка SMTP…</p>}
         {smtpQuery.isError && (
           <p className="mt-2 text-sm text-red-300">{(smtpQuery.error as Error).message}</p>
         )}
         {smtpQuery.data && (
-          <div className="mt-3 grid gap-2 text-sm mo-muted">
-            <div>
-              <span className="mo-muted">HOST:</span> {smtpQuery.data.host || "—"}
-            </div>
-            <div>
-              <span className="mo-muted">PORT:</span> {smtpQuery.data.port}
-            </div>
-            <div>
-              <span className="mo-muted">USER:</span> {smtpQuery.data.user || "—"}
-            </div>
-            <div>
-              <span className="mo-muted">FROM:</span> {smtpQuery.data.from_email || "—"}
-            </div>
-            <div>
-              <span className="mo-muted">PASSWORD:</span>{" "}
-              {smtpQuery.data.has_password ? "задан" : "не задан"}
-            </div>
-            <div>
-              <span className="mo-muted">PUBLIC_APP_URL:</span>{" "}
-              {smtpQuery.data.public_app_url || "—"}
-            </div>
-            <div>
-              <span className="mo-muted">PUBLIC_API_BASE_URL (WhatsApp):</span>{" "}
-              {smtpQuery.data.public_api_base_url || "— (берётся из запроса, иначе задайте в .env)"}
+          <div className="mt-3 grid gap-2 text-sm">
+            <p className="text-xs mo-muted">
+              Источник:{" "}
+              {smtpQuery.data.source === "env"
+                ? "Amvera env"
+                : smtpQuery.data.source === "company_gmail"
+                  ? "сохранено в CRM (Gmail)"
+                  : "не настроено"}
+              {smtpQuery.data.has_password ? " · пароль задан" : " · пароль не задан"}
+            </p>
+            <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
+              HOST
+              <input
+                className="mo-input"
+                value={smtpDraft.host}
+                onChange={(e) => setSmtpDraft((s) => ({ ...s, host: e.target.value }))}
+                placeholder="smtp.gmail.com"
+              />
+            </label>
+            <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
+              PORT
+              <input
+                className="mo-input"
+                value={smtpDraft.port}
+                onChange={(e) => setSmtpDraft((s) => ({ ...s, port: e.target.value }))}
+                placeholder="587"
+              />
+            </label>
+            <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
+              USER (Gmail)
+              <input
+                className="mo-input"
+                value={smtpDraft.user}
+                onChange={(e) => setSmtpDraft((s) => ({ ...s, user: e.target.value }))}
+                placeholder="metoditj@gmail.com"
+              />
+            </label>
+            <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
+              FROM
+              <input
+                className="mo-input"
+                value={smtpDraft.from_email}
+                onChange={(e) => setSmtpDraft((s) => ({ ...s, from_email: e.target.value }))}
+                placeholder="metoditj@gmail.com"
+              />
+            </label>
+            <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
+              PASSWORD (пароль приложения Gmail)
+              <input
+                type="password"
+                className="mo-input"
+                value={smtpDraft.password}
+                onChange={(e) => setSmtpDraft((s) => ({ ...s, password: e.target.value }))}
+                placeholder={smtpQuery.data.has_password ? "оставьте пустым, чтобы не менять" : "xxxx xxxx xxxx xxxx"}
+                autoComplete="new-password"
+              />
+            </label>
+            <div className="mt-1 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn-primary disabled:opacity-60"
+                disabled={smtpSaveMutation.isPending || !smtpDraft.user.trim()}
+                onClick={() => smtpSaveMutation.mutate()}
+              >
+                {smtpSaveMutation.isPending ? "Сохранение…" : "Сохранить SMTP"}
+              </button>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
               <input
@@ -1050,7 +1133,7 @@ export function EmployeesPage() {
               <button
                 type="button"
                 onClick={() => smtpTestMutation.mutate()}
-                disabled={smtpTestMutation.isPending}
+                disabled={smtpTestMutation.isPending || !smtpTestEmail.trim()}
                 className="btn-secondary disabled:opacity-60"
               >
                 {smtpTestMutation.isPending ? "Отправка…" : "Тестовое письмо"}
