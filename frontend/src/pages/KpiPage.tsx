@@ -481,7 +481,7 @@ function paymentKindLabel(kind: string): string {
   return "оплата";
 }
 
-/** Карточка пациента из продажи курса/протокола — полная история оплат. */
+/** Карточка клиента из продажи курса/протокола — полная история оплат. */
 function manualSaleToPatientCard(sale: SalesKpiManualSale): SalesKpiDebtorRow {
   return {
     source: "manual",
@@ -645,7 +645,7 @@ function DebtorOwnerTools({
       <p className="text-[11px] font-semibold text-[var(--mo-text)]">Правка / снять с дебиторки</p>
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1 text-[11px] mo-muted">
-          Цена
+          Сумма
           <input
             type="number"
             min={0}
@@ -653,11 +653,11 @@ function DebtorOwnerTools({
             className="mo-input w-24 !min-h-9 text-sm"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            aria-label="Цена долга"
+            aria-label="Сумма долга"
           />
         </label>
         <label className="flex flex-col gap-1 text-[11px] mo-muted">
-          Оплачено
+          Оплата
           <input
             type="number"
             min={0}
@@ -665,7 +665,7 @@ function DebtorOwnerTools({
             className="mo-input w-24 !min-h-9 text-sm"
             value={paid}
             onChange={(e) => setPaid(e.target.value)}
-            aria-label="Оплачено по долгу"
+            aria-label="Оплата по долгу"
           />
         </label>
         <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-[11px] mo-muted">
@@ -1072,8 +1072,8 @@ export function KpiPage() {
       if (!pipelineId) throw new Error("Выберите воронку");
       const clientName = saleForm.client_name.trim() || selectedLead?.name?.trim() || "";
       const clientPhone = saleForm.client_phone.trim() || selectedLead?.phone?.trim() || "";
-      if (!clientName) throw new Error("Укажите имя клиента или выберите пациента");
-      if (!clientPhone) throw new Error("Укажите телефон или выберите пациента с телефоном");
+      if (!clientName) throw new Error("Укажите имя клиента или выберите клиента из поиска");
+      if (!clientPhone) throw new Error("Укажите телефон или выберите клиента с телефоном");
       const groupNo = saleForm.group_no ? Number(saleForm.group_no) : null;
       await apiFetch<SalesKpiManualSale>("/api/sales-kpi/manual-sales", {
         method: "POST",
@@ -1101,7 +1101,7 @@ export function KpiPage() {
           ? "Запись сохранена. Оплата ждёт подтверждения бухгалтера"
           : selectedLead
             ? `Продажа добавлена · #${selectedLead.lead_id}`
-            : "Продажа добавлена без привязки к пациенту",
+            : "Продажа добавлена без привязки к клиенту",
       );
       setSaleForm({
         plan_item_id: "",
@@ -2343,12 +2343,12 @@ export function KpiPage() {
                   <th>Тип</th>
                   <th>Поток</th>
                   <th>Менеджер</th>
-                  <th>Пациент</th>
+                  <th>Клиент</th>
                   <th>Телефон</th>
                   <th>Сумма</th>
-                  <th>Оплачено</th>
+                  <th>Оплата</th>
                   <th>Долг</th>
-                  <th className="print-omit">Оплата</th>
+                  <th className="print-omit">Доплата</th>
           </tr>
         </thead>
         <tbody>
@@ -2422,7 +2422,7 @@ export function KpiPage() {
                       <button
                         type="button"
                         className="text-left font-medium text-[var(--mo-text)] underline-offset-2 hover:underline"
-                        title="История оплат пациента"
+                        title="История оплат клиента"
                         onClick={() => setPatientCard(manualSaleToPatientCard(s))}
                       >
                         {s.client_name}
@@ -2641,7 +2641,7 @@ export function KpiPage() {
                         </span>
                       </div>
                       <div className="flex justify-between gap-2">
-                        <span className="mo-muted">Оплачено</span>
+                        <span className="mo-muted">Оплата</span>
                         <span className="tabular-nums text-[var(--mo-text)]">
                           {formatMoney(num(r.paid_amount))}
                         </span>
@@ -2734,10 +2734,10 @@ export function KpiPage() {
                     <span className="print-screen-only">Сумма</span>
                     <span className="mo-print-only">Стоимость курса</span>
                   </th>
-                  <th className="py-2 pr-3">Оплачено</th>
+                  <th className="py-2 pr-3">Оплата</th>
                   <th className="py-2 pr-3">
                     <span className="print-screen-only">Долг</span>
-                    <span className="mo-print-only">Цена дебиторки</span>
+                    <span className="mo-print-only">Сумма дебиторки</span>
                   </th>
                   <th className="print-omit py-2 pr-3">Сбор</th>
                 </tr>
@@ -3123,7 +3123,7 @@ function SalesReportSection({
                   ) : (
                     <>
                       <p className="mb-2 text-[11px] mo-muted">
-                        Цена — за сколько продали. Оплачено — всего. Неполная (Курс 15 / Протокол) и ниже мин. (Курс) — строка есть, серым «не в оплату», в % не входит. Итого в шапке — только зачтённое.
+                        Сумма — за сколько продали. Оплата — всего внесено. Неполная (Курс 15 / Протокол) и ниже мин. (Курс) — строка есть, серым «не в оплату», в % не входит. Итого в шапке — только зачтённое.
                       </p>
                       <ul className="space-y-2 sm:hidden">
                         {detailQuery.data.rows.map((r, idx) => {
@@ -3146,7 +3146,7 @@ function SalesReportSection({
                               </span>
                             </div>
                             <p className="text-[11px] mo-muted">
-                              цена {formatMoney(num(r.service_amount))} · оплачено {formatMoney(num(r.paid_amount))}
+                              сумма {formatMoney(num(r.service_amount))} · оплата {formatMoney(num(r.paid_amount))}
                               {r.is_new ? " · новый" : " · доплата"}
                               {r.sold_at ? ` · ${String(r.sold_at).slice(0, 10)}` : ""}
                               {notPaid && r.note ? ` · ${r.note}` : ""}
@@ -3160,8 +3160,8 @@ function SalesReportSection({
                           <tr>
                             <th className="kpi-row-num">№</th>
                             <th>Клиент</th>
-                            <th>Цена</th>
-                            <th>Оплачено</th>
+                            <th>Сумма</th>
+                            <th>Оплата</th>
                             <th>Привёл</th>
                             <th>Дата</th>
                             <th></th>

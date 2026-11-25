@@ -21,7 +21,7 @@ type SearchOut = {
 type Props = {
   selected: KpiLeadPick | null;
   onSelect: (lead: KpiLeadPick | null) => void;
-  /** When set from Lead card / URL — picker locked to this patient until cleared. */
+  /** When set from Lead card / URL — picker locked to this client until cleared. */
   lockedFromContext?: boolean;
   disabled?: boolean;
   /** Имя или телефон из соседних полей формы — список появляется без отдельного поиска. */
@@ -65,7 +65,7 @@ export function KpiLeadPicker({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-[11px] mo-muted">
-              {lockedFromContext ? "Пациент из карточки Lead" : "Пациент выбран"}
+              {lockedFromContext ? "Клиент из карточки Lead" : "Клиент выбран"}
             </p>
             <p className="truncate text-sm font-semibold text-[var(--mo-text)]">{selected.name}</p>
             <p className="mt-0.5 text-xs tabular-nums mo-muted">
@@ -91,16 +91,16 @@ export function KpiLeadPicker({
   }
 
   return (
-    <div className="kpi-patient-search col-span-2 flex flex-col gap-0.5 md:col-span-4">
+    <div className="kpi-client-search col-span-2 flex flex-col gap-0.5 md:col-span-4">
       <label className="text-[11px] mo-muted">
-        Поиск пациента
+        Поиск клиента
         <input
           type="search"
           className="mo-input mt-0.5 !min-h-11 w-full text-base sm:!min-h-0 sm:text-sm"
           value={q}
           disabled={disabled}
           placeholder="ФИО, телефон или номер карточки"
-          title="Можно не выбирать: продажа сохранится без карточки. Если номер общий, выберите нужного ребёнка."
+          title="Можно не выбирать: продажа сохранится без карточки. Если номер общий, выберите нужного клиента."
           onChange={(e) => setQ(e.target.value)}
           autoComplete="off"
         />
@@ -113,7 +113,7 @@ export function KpiLeadPicker({
       ) : null}
       {multiPhoneHint ? (
         <p className="text-[11px] text-amber-700/90 dark:text-amber-300/90">
-          Несколько пациентов с похожим телефоном — выберите нужного ребёнка.
+          Несколько клиентов с похожим телефоном — выберите нужного.
         </p>
       ) : null}
       {items.length > 0 ? (

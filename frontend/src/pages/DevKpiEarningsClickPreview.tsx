@@ -212,8 +212,8 @@ export function DevKpiEarningsClickPreview() {
                     <thead>
                       <tr>
                         <th>Клиент</th>
-                        <th>Цена</th>
-                        <th>Оплачено</th>
+                        <th>Сумма</th>
+                        <th>Оплата</th>
                         <th>Привёл</th>
                         <th>Дата</th>
                         <th></th>

@@ -63,7 +63,7 @@ export function DebtorPatientCard({
 
         {leadId == null ? (
           <p className="mt-3 rounded-xl border border-[var(--mo-border)] bg-[var(--mo-surface-elevated)] px-3 py-2.5 text-sm leading-relaxed text-[var(--mo-text)]">
-            Продажа ещё не связана с карточкой пациента. Приёмов и смены менеджера здесь нет. Они появятся, когда продажу свяжут с человеком в CRM.
+            Продажа ещё не связана с карточкой клиента. Приёмов и смены менеджера здесь нет. Они появятся, когда продажу свяжут с человеком в CRM.
           </p>
         ) : cardQuery.isLoading ? (
           <p className="mt-3 text-sm mo-muted">Загрузка карточки…</p>
