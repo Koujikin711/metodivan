@@ -2080,7 +2080,7 @@ export function ChatPage() {
                     ) : (
                       <p className="mt-2 text-sm text-[var(--mo-text)]">
                         📍 Metodi Clinic
-                        <span className="mt-0.5 block mo-muted">ул. Б. Гафурова, 35, 4 этаж, Душанбе</span>
+                        <span className="mt-0.5 block mo-muted">ул. Дилкушо, Душанбе</span>
                       </p>
                     )}
                     {locError ? <p className="mt-2 text-xs text-rose-400">{locError}</p> : null}

@@ -30,11 +30,11 @@ class Settings(BaseSettings):
     chat_media_dir: str = ""
 
     # Единая локация клиники для WhatsApp (все менеджеры шлют одно и то же; не GPS телефона).
-    # Источник координат: 2ГИС Metodi clinic, ул. Бободжана Гафурова, 35.
+    # Источник: https://maps.google.com/?q=38.546066,68.754959 (ул. Дилкушо, Душанбе).
     clinic_wa_location_name: str = "Metodi Clinic"
-    clinic_wa_location_address: str = "ул. Б. Гафурова, 35, 4 этаж, Душанбе"
-    clinic_wa_location_lat: float = 38.586571
-    clinic_wa_location_lng: float = 68.741985
+    clinic_wa_location_address: str = "ул. Дилкушо, Душанбе"
+    clinic_wa_location_lat: float = 38.546066
+    clinic_wa_location_lng: float = 68.754959
 
     # Public URL фронтенда (для invite ссылок)
     public_app_url: str = ""
