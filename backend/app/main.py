@@ -749,16 +749,10 @@ async def _run_startup_db_and_seed() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     _install_asyncio_dns_exception_handler()
-    # 2 реплики / lock на миграциях раньше вешали uvicorn до yield → Amvera 503.
+    # Amvera: не ждать миграции/сиды до yield — иначе gateway 502/503 на каждый push
+    # (uvicorn не принимает /health, пока lifespan не прошёл yield).
+    # Миграции идут в фоне; SPA/health отвечают сразу, API сам стабилизируется.
     boot_task = asyncio.create_task(_run_startup_db_and_seed(), name="startup-db-seed")
-    try:
-        await asyncio.wait_for(asyncio.shield(boot_task), timeout=60.0)
-    except TimeoutError:
-        logger.error(
-            "startup DB/seed still running after 60s — accepting traffic; boot continues in background",
-        )
-    except Exception:
-        logger.exception("startup DB/seed failed before accept")
     stop_event = asyncio.Event()
 
     async def _deferred_chat_indexes() -> None:

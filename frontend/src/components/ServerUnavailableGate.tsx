@@ -14,7 +14,9 @@ import {
   subscribeServerOutage,
 } from "@/lib/serverOutage";
 
-const HEALTH_POLL_MS = 2500;
+const HEALTH_POLL_MS = 2000;
+/** После долгого outage — полный reload (подтянуть новый бандл после деплоя). */
+const HARD_RELOAD_AFTER_MS = 45_000;
 
 /**
  * Если API лёг (деплой Amvera / 502–504 / сеть) — один экран с роботом,
@@ -56,6 +58,7 @@ export function ServerUnavailableGate({ children }: { children: ReactNode }) {
     if (!down) return;
     toast.dismiss();
     let cancelled = false;
+    const startedAt = Date.now();
 
     const probe = async () => {
       if (cancelled || recoveringRef.current) return;
@@ -65,13 +68,20 @@ export function ServerUnavailableGate({ children }: { children: ReactNode }) {
           headers: { Accept: "application/json" },
           cache: "no-store",
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (Date.now() - startedAt >= HARD_RELOAD_AFTER_MS) {
+            window.location.reload();
+          }
+          return;
+        }
         recoveringRef.current = true;
         setServerOutage(false);
         await queryClient.invalidateQueries();
         await queryClient.refetchQueries({ type: "active" });
       } catch {
-        /* still down */
+        if (Date.now() - startedAt >= HARD_RELOAD_AFTER_MS) {
+          window.location.reload();
+        }
       } finally {
         recoveringRef.current = false;
       }

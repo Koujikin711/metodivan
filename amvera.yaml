@@ -9,3 +9,6 @@ run:
   containerPort: 8000
   servicePort: 80
   persistenceMount: /app/data
+  # Бесшовный деплой: новый контейнер поднимается до остановки старого.
+  # Несовместимо с run.singleton. Без этого каждый git push даёт 502/503.
+  zeroDowntime: true

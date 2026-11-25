@@ -32,6 +32,23 @@
         var t = localStorage.getItem("mo-theme");
         if (t === "dark") document.documentElement.dataset.theme = "dark";
         else document.documentElement.dataset.theme = "light";
+        /* Если бандл не поднялся (деплой Amvera) — тихо перезагрузить, не сидеть на пустом экране. */
+        setTimeout(function () {
+          var root = document.getElementById("root");
+          if (root && !root.childElementCount) {
+            try {
+              var n = Number(sessionStorage.getItem("crmdn-boot-retry") || "0");
+              if (n < 4) {
+                sessionStorage.setItem("crmdn-boot-retry", String(n + 1));
+                location.reload();
+              }
+            } catch (e) {}
+          } else {
+            try {
+              sessionStorage.removeItem("crmdn-boot-retry");
+            } catch (e) {}
+          }
+        }, 8000);
       })();
     </script>
   </head>
