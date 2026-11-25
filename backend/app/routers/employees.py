@@ -345,8 +345,19 @@ def _invite_app_base(request: Request | None = None) -> str:
     return base
 
 
-def _build_invite_url(invite_token: str, request: Request | None = None) -> str:
-    return f"{_invite_app_base(request)}/login?invite={invite_token}"
+def _build_invite_url(
+    invite_token: str,
+    request: Request | None = None,
+    *,
+    email: str | None = None,
+) -> str:
+    from urllib.parse import quote
+
+    base = f"{_invite_app_base(request)}/login?invite={invite_token}"
+    em = (email or "").strip()
+    if em:
+        base += f"&email={quote(em, safe='@.')}"
+    return base
 
 
 async def _company_smtp_override(db: AsyncSession, company_id: int) -> dict[str, object] | None:
@@ -454,11 +465,14 @@ def _credentials_whatsapp_text(
     invite_url: str,
 ) -> str:
     return (
-        "Доступ к CRM-DN\n\n"
+        "Доступ к CRM-DN (не MetodiOne)\n\n"
         f"Логин: {email}\n"
         f"Пароль: {temp_password}\n"
-        f"Вход: {invite_url}\n\n"
-        "Старый пароль больше не действует. После входа смените пароль."
+        f"Ссылка: {invite_url}\n\n"
+        "Откройте именно эту ссылку. Логин копируйте целиком.\n"
+        "После входа система попросит сменить пароль: "
+        "в «текущий» вставьте пароль из этого сообщения, затем придумайте новый.\n"
+        "Старый пароль больше не действует."
     )
 
 
@@ -874,7 +888,7 @@ async def invite_employee(
                 course_stream_gap_days=body.course_stream_gap_days,
             )
 
-    invite_url = _build_invite_url(invite_token, request)
+    invite_url = _build_invite_url(invite_token, request, email=email)
     intro = "Вам восстановили доступ к CRM-DN." if rehire else "Вас пригласили в CRM-DN."
     emp = await _employee_read(db, u)
     smtp_ov = await _company_smtp_override(db, company_id)
@@ -1184,7 +1198,7 @@ async def patch_employee_contact(
 
             temp_password = _rand_password()
             invite_token = secrets.token_urlsafe(32)
-            invite_url = _build_invite_url(invite_token)
+            invite_url = _build_invite_url(invite_token, email=normalized)
             intro = "Для вашего аккаунта в CRM-DN изменён email. Используйте новые данные для входа."
             smtp_ov = await _company_smtp_override(db, company_id)
             credentials_sent, mail_err = _send_employee_credentials_email(
@@ -1459,7 +1473,7 @@ async def resend_employee_credentials(
     target.must_change_password = True
     await db.flush()
 
-    invite_url = _build_invite_url(invite_token, request)
+    invite_url = _build_invite_url(invite_token, request, email=target.email)
     intro = "Вам повторно выслан доступ к CRM-DN. Используйте новые данные для входа."
     smtp_ov = await _company_smtp_override(db, company_id)
     email_sent, email_err = _send_employee_credentials_email(

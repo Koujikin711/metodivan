@@ -52,6 +52,13 @@ export function LoginPage() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
 
   useEffect(() => {
+    const prefill = (searchParams.get("email") || searchParams.get("login") || "").trim();
+    if (prefill && !email) {
+      setEmail(prefill);
+    }
+  }, [searchParams, email]);
+
+  useEffect(() => {
     const session = searchParams.get("session");
     if (!session) return;
     setSearchParams({}, { replace: true });
@@ -114,7 +121,9 @@ export function LoginPage() {
     onError: (e: Error) => {
       const m = e.message || "";
       if (m === "Incorrect login or password") {
-        setError("Неверный логин или пароль");
+        setError(
+          "Неверный логин или пароль. Нужен сайт CRM-DN (не MetodiOne), логин точно как в WhatsApp, пароль — из последнего сообщения.",
+        );
         return;
       }
       if (mode === "login" && (m.includes("приостановлен") || m.includes("Компания временно"))) {
@@ -149,7 +158,9 @@ export function LoginPage() {
           </p>
           {mode === "login" ? (
             <p className="mt-2 max-w-sm text-[11px] leading-relaxed text-[var(--mo-text-muted)]">
-              Вход сотрудников CRM-DN: email и пароль из WhatsApp или письма.
+              {searchParams.get("invite")
+                ? "Приглашение CRM-DN: логин уже подставлен, пароль возьмите из WhatsApp. После входа смените пароль (в «текущий» — пароль из WhatsApp)."
+                : "Вход сотрудников CRM-DN: email и пароль из WhatsApp или письма."}
             </p>
           ) : null}
         </div>

@@ -46,7 +46,7 @@ export function ForcePasswordPage() {
           </div>
           <h1 className="mt-6 text-2xl font-semibold tracking-tight text-[var(--mo-text)]">Смена пароля</h1>
           <p className="mt-2 max-w-sm text-sm text-[var(--mo-text-muted)]">
-            По политике безопасности нужно задать новый пароль, прежде чем открывать остальные разделы.
+            В поле «Текущий пароль» вставьте пароль из WhatsApp, затем придумайте новый (не меньше 8 символов).
           </p>
         </div>
 
