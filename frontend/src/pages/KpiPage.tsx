@@ -1889,7 +1889,7 @@ export function KpiPage() {
                   : "Нет продуктов плана (Консультация, Интенсив, Курс). Откройте «Пакеты / услуги» или обновите страницу после деплоя."}
             </p>
           ) : saleFormOpen ? (
-            <div className="grid max-w-5xl grid-cols-2 gap-x-2 gap-y-1.5 md:grid-cols-4">
+            <div className="kpi-sale-form grid max-w-5xl grid-cols-1 gap-y-1.5">
               <KpiLeadPicker
                 selected={selectedLead}
                 lockedFromContext={leadFromContext}
@@ -1905,111 +1905,97 @@ export function KpiPage() {
                   }
                 }}
               />
-              <label className="col-span-2 flex flex-col gap-0.5 text-[11px] mo-muted md:col-span-2">
-                Клиент
-                <input
-                  className="mo-input !min-h-11 text-base sm:!min-h-0 sm:text-sm"
-                  value={saleForm.client_name}
-                  placeholder="ФИО"
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setSaleForm((s) => ({ ...s, client_name: value }));
-                    setSelectedLead((cur) =>
-                      cur && value.trim() && value.trim() !== cur.name ? null : cur,
-                    );
-                    setLeadFromContext(false);
-                  }}
-                />
-              </label>
-              <label className="col-span-2 flex flex-col gap-0.5 text-[11px] mo-muted md:col-span-2">
-                Телефон
-                <input
-                  className="mo-input !min-h-11 text-base sm:!min-h-0 sm:text-sm"
-                  inputMode="tel"
-                  value={saleForm.client_phone}
-                  placeholder="Номер"
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setSaleForm((s) => ({ ...s, client_phone: value }));
-                    setSelectedLead((cur) => {
-                      if (!cur) return null;
-                      const typed = value.replace(/\D/g, "").slice(-9);
-                      const saved = (cur.phone || "").replace(/\D/g, "").slice(-9);
-                      if (typed.length >= 4 && saved && typed !== saved) return null;
-                      return cur;
-                    });
-                    setLeadFromContext(false);
-                  }}
-                />
-              </label>
-              <div className="col-span-2 grid grid-cols-2 gap-x-2 gap-y-1.5 md:col-span-4 md:grid-cols-12">
-              <label className="col-span-2 flex flex-col gap-0.5 text-[11px] mo-muted md:col-span-3">
-                Продукт
-                <select
-                  className="mo-input !min-h-11 text-base sm:!min-h-0 sm:text-sm"
-                  value={saleForm.plan_item_id}
-                  onChange={(e) => setSaleForm((s) => ({ ...s, plan_item_id: e.target.value }))}
-                >
-                  <option value="">—</option>
-                  {manualPlanItems.map((it) => (
-                    <option key={it.id} value={it.id}>
-                      {it.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="col-span-2 flex flex-col gap-0.5 text-[11px] mo-muted md:col-span-5">
-                Менеджер
-                <select
-                  className="mo-input !min-h-11 text-base sm:!min-h-0 sm:text-sm"
-                  value={saleForm.manager_user_id}
-                  disabled={isManager}
-                  onChange={(e) => setSaleForm((s) => ({ ...s, manager_user_id: e.target.value }))}
-                >
-                  <option value="">—</option>
-                  {managers.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                  {isManager &&
-                  meQuery.data?.id &&
-                  !managers.some((m) => m.id === meQuery.data?.id) ? (
-                    <option value={meQuery.data.id}>{meQuery.data.full_name || "Вы"}</option>
-                  ) : null}
-                </select>
-              </label>
-              <label className="flex flex-col gap-0.5 text-[11px] mo-muted md:col-span-2">
-                Поток <span className="font-normal opacity-70">(необязательно)</span>
-                <select
-                  className="mo-input !min-h-11 text-base sm:!min-h-0 sm:text-sm"
-                  value={saleForm.group_no}
-                  onChange={(e) => setSaleForm((s) => ({ ...s, group_no: e.target.value }))}
-                  title="Можно оставить пустым; один номер — один поток куратора"
-                >
-                  <option value="">—</option>
-                  {KPI_GROUP_OPTIONS.map((n) => (
-                    <option key={n} value={n}>
-                      Поток {n}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-0.5 text-[11px] mo-muted md:col-span-2">
-                Стоимость
-                <input
-                  type="number"
-                  min={0}
-                  inputMode="decimal"
-                  className="mo-input !min-h-11 text-base sm:!min-h-0 sm:text-sm"
-                  value={saleForm.service_amount}
-                  onChange={(e) => setSaleForm((s) => ({ ...s, service_amount: e.target.value }))}
-                />
-              </label>
-              </div>
-              <div className="kpi-sale-pays col-span-2 md:col-span-4">
+              {/* 1 ряд: ФИО · номер · продукт (поток убран) */}
+              <div className="kpi-sale-form__row grid grid-cols-1 gap-x-2 gap-y-1.5 sm:grid-cols-3">
                 <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
-                  Первый платёж
+                  Клиент
+                  <input
+                    className="mo-input !min-h-11 text-base sm:!min-h-0 sm:text-sm"
+                    value={saleForm.client_name}
+                    placeholder="ФИО"
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSaleForm((s) => ({ ...s, client_name: value }));
+                      setSelectedLead((cur) =>
+                        cur && value.trim() && value.trim() !== cur.name ? null : cur,
+                      );
+                      setLeadFromContext(false);
+                    }}
+                  />
+                </label>
+                <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
+                  Телефон
+                  <input
+                    className="mo-input !min-h-11 text-base sm:!min-h-0 sm:text-sm"
+                    inputMode="tel"
+                    value={saleForm.client_phone}
+                    placeholder="Номер"
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSaleForm((s) => ({ ...s, client_phone: value }));
+                      setSelectedLead((cur) => {
+                        if (!cur) return null;
+                        const typed = value.replace(/\D/g, "").slice(-9);
+                        const saved = (cur.phone || "").replace(/\D/g, "").slice(-9);
+                        if (typed.length >= 4 && saved && typed !== saved) return null;
+                        return cur;
+                      });
+                      setLeadFromContext(false);
+                    }}
+                  />
+                </label>
+                <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
+                  Продукт
+                  <select
+                    className="mo-input !min-h-11 text-base sm:!min-h-0 sm:text-sm"
+                    value={saleForm.plan_item_id}
+                    onChange={(e) => setSaleForm((s) => ({ ...s, plan_item_id: e.target.value }))}
+                  >
+                    <option value="">—</option>
+                    {manualPlanItems.map((it) => (
+                      <option key={it.id} value={it.id}>
+                        {it.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              {/* 2 ряд: менеджер · стоимость · оплата · дата */}
+              <div className="kpi-sale-form__row grid grid-cols-2 gap-x-2 gap-y-1.5 sm:grid-cols-4">
+                <label className="col-span-2 flex flex-col gap-0.5 text-[11px] mo-muted sm:col-span-1">
+                  Менеджер
+                  <select
+                    className="mo-input !min-h-11 text-base sm:!min-h-0 sm:text-sm"
+                    value={saleForm.manager_user_id}
+                    disabled={isManager}
+                    onChange={(e) => setSaleForm((s) => ({ ...s, manager_user_id: e.target.value }))}
+                  >
+                    <option value="">—</option>
+                    {managers.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                    {isManager &&
+                    meQuery.data?.id &&
+                    !managers.some((m) => m.id === meQuery.data?.id) ? (
+                      <option value={meQuery.data.id}>{meQuery.data.full_name || "Вы"}</option>
+                    ) : null}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
+                  Стоимость
+                  <input
+                    type="number"
+                    min={0}
+                    inputMode="decimal"
+                    className="mo-input !min-h-11 text-base sm:!min-h-0 sm:text-sm"
+                    value={saleForm.service_amount}
+                    onChange={(e) => setSaleForm((s) => ({ ...s, service_amount: e.target.value }))}
+                  />
+                </label>
+                <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
+                  Оплата
                   <input
                     type="number"
                     min={0}
@@ -2019,21 +2005,21 @@ export function KpiPage() {
                     onChange={(e) => setSaleForm((s) => ({ ...s, paid_amount: e.target.value }))}
                   />
                 </label>
-                <label className="kpi-sale-pays__date flex flex-col gap-0.5 text-[11px] mo-muted">
-                  Дата 1-го
+                <label className="col-span-2 flex flex-col gap-0.5 text-[11px] mo-muted sm:col-span-1">
+                  Дата
                   <DateField
                     value={saleForm.first_paid_at}
                     onChange={(v) => setSaleForm((s) => ({ ...s, first_paid_at: v }))}
                     aria-label="Дата первого платежа"
                   />
                 </label>
-                {isManager ? null : (
-                  <p className="kpi-sale-pays__hint">
-                    пусто → сегодня; выручка по месяцу даты. Доплату позже — из карточки продажи.
-                  </p>
-                )}
               </div>
-              <label className="col-span-2 flex flex-col gap-0.5 text-[11px] mo-muted md:col-span-4">
+              {isManager ? null : (
+                <p className="text-[10px] leading-snug mo-muted">
+                  пусто → сегодня; выручка по месяцу даты. Доплату позже — из карточки продажи.
+                </p>
+              )}
+              <label className="flex flex-col gap-0.5 text-[11px] mo-muted">
                 Комментарий
                 <input
                   className="mo-input !min-h-11 text-base sm:!min-h-0 sm:text-sm"

@@ -61,7 +61,7 @@ export function KpiLeadPicker({
 
   if (selected) {
     return (
-      <div className="col-span-2 rounded-lg border border-[var(--mo-border)] bg-[var(--mo-surface)] px-2.5 py-1.5 md:col-span-4">
+      <div className="w-full rounded-lg border border-[var(--mo-border)] bg-[var(--mo-surface)] px-2.5 py-1.5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-[11px] mo-muted">
@@ -91,7 +91,7 @@ export function KpiLeadPicker({
   }
 
   return (
-    <div className="kpi-client-search col-span-2 flex flex-col gap-0.5 md:col-span-4">
+    <div className="kpi-client-search flex w-full flex-col gap-0.5">
       <label className="text-[11px] mo-muted">
         Поиск клиента
         <input
