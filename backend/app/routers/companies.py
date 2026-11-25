@@ -119,7 +119,7 @@ def _rand_password() -> str:
 
 
 def _invite_app_base() -> str:
-    raw = (settings.public_app_url or "").strip() or "https://metodione.com"
+    raw = (settings.public_app_url or "").strip() or "https://crm-dn-koujikin.mia0.amvera.tech"
     if not raw.startswith(("http://", "https://")):
         raw = "https://" + raw
     p = urlparse(raw)

@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Annotated
 from urllib.parse import urlparse, urlunparse
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -38,9 +38,13 @@ from app.services.booking_directions import ensure_specialist_direction_link
 from app.services.audit import write_audit_event
 from app.services.chief_expert_access import assert_owner_admin_or_chief_expert, assert_owner_or_chief_expert
 from app.services.debtor_collection import clinic_today
+from app.services.finance_integrate import get_gmail_integration
 from app.services.green_api_send import send_green_text_async
 from app.services.mail import send_email, smtp_misconfig_hint
 from app.services.phone_match import whatsapp_e164_digits
+
+# CRM-DN live (не MetodiOne) — fallback, если PUBLIC_APP_URL пуст и нет Host запроса.
+_CRM_DN_DEFAULT_APP_URL = "https://crm-dn-koujikin.mia0.amvera.tech"
 
 router = APIRouter(prefix="/employees", tags=["employees"])
 
@@ -305,20 +309,28 @@ async def _sync_expert_calendar_profile(
     await db.flush()
 
 
-def _invite_app_base() -> str:
+def _invite_app_base(request: Request | None = None) -> str:
     """
     Абсолютный URL фронта (без завершающего /).
-    В письмах нельзя использовать относительные ссылки — Gmail даёт битый вид http:///login.
-    Пустая настройка — живой сайт, отдельную переменную для этого не требуем.
+    Приоритет: PUBLIC_APP_URL → Host запроса (Amvera) → CRM-DN live.
     """
-    raw = (settings.public_app_url or "").strip() or "https://metodione.com"
+    raw = (settings.public_app_url or "").strip()
+    if not raw and request is not None:
+        host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(",")[0].strip()
+        if host and "localhost" not in host and "127.0.0.1" not in host:
+            proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "https").split(",")[0].strip()
+            if proto not in ("http", "https"):
+                proto = "https"
+            raw = f"{proto}://{host}"
+    if not raw:
+        raw = _CRM_DN_DEFAULT_APP_URL
     if not raw.startswith(("http://", "https://")):
         raw = "https://" + raw
     p = urlparse(raw)
     if p.scheme not in ("http", "https") or not p.netloc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Адрес сайта указан неверно. Пример: https://metodione.com",
+            detail="Адрес сайта указан неверно. Пример: https://crm-dn-koujikin.mia0.amvera.tech",
         )
     path = (p.path or "").rstrip("/")
     if path == "/":
@@ -327,13 +339,34 @@ def _invite_app_base() -> str:
     if not base:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Адрес сайта указан неверно (нет домена). Пример: https://metodione.com",
+            detail="Адрес сайта указан неверно (нет домена).",
         )
     return base
 
 
-def _build_invite_url(invite_token: str) -> str:
-    return f"{_invite_app_base()}/login?invite={invite_token}"
+def _build_invite_url(invite_token: str, request: Request | None = None) -> str:
+    return f"{_invite_app_base(request)}/login?invite={invite_token}"
+
+
+async def _company_smtp_override(db: AsyncSession, company_id: int) -> dict[str, object] | None:
+    """Если глобальный SMTP пуст — взять Gmail-интеграцию компании (app_password)."""
+    if (settings.smtp_host or "").strip():
+        return None
+    integ = await get_gmail_integration(db, company_id)
+    if integ is None:
+        return None
+    cfg = integ.config if isinstance(integ.config, dict) else {}
+    email_addr = str(cfg.get("email") or cfg.get("gmail_email") or "").strip()
+    app_password = str(cfg.get("app_password") or cfg.get("appPassword") or "").strip()
+    if not email_addr or not app_password:
+        return None
+    return {
+        "smtp_host": str(cfg.get("smtp_host") or "smtp.gmail.com").strip() or "smtp.gmail.com",
+        "smtp_port": int(cfg.get("smtp_port") or 587),
+        "smtp_user": email_addr,
+        "smtp_password": app_password,
+        "smtp_from": email_addr,
+    }
 
 
 def _credentials_email_bodies(
@@ -367,7 +400,7 @@ def _credentials_email_bodies(
       <p style="margin:8px 0;"><strong>Пароль:</strong> <code style="background:#f1f5f9;padding:2px 8px;border-radius:6px;">{safe_pw}</code></p>
     </td></tr>
     <tr><td style="padding:16px 28px 28px;">
-      <a href="{safe_url}" style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;text-decoration:none;padding:12px 24px;border-radius:12px;font-weight:600;font-size:15px;">Войти в CRM</a>
+      <a href="{safe_url}" style="display:inline-block;background:linear-gradient(135deg,#0f766e,#14b8a6);color:#fff;text-decoration:none;padding:12px 24px;border-radius:12px;font-weight:600;font-size:15px;">Войти в CRM-DN</a>
       <p style="margin:20px 0 0;font-size:13px;color:#64748b;">Если кнопка не открывается, скопируйте ссылку:<br/><span style="word-break:break-all;color:#475569;">{safe_url}</span></p>
     </td></tr>
   </table>
@@ -378,13 +411,13 @@ def _credentials_email_bodies(
 def _send_employee_credentials_email(
     to_email: str,
     temp_password: str,
-    invite_token: str,
+    invite_url: str,
     *,
     intro: str,
-    subject: str = "Доступ к CRM",
-    heading: str = "Доступ к CRM",
+    subject: str = "Доступ к CRM-DN",
+    heading: str = "Доступ к CRM-DN",
+    smtp_override: dict[str, object] | None = None,
 ) -> tuple[bool, str | None]:
-    invite_url = _build_invite_url(invite_token)
     plain, html_body = _credentials_email_bodies(
         email=to_email,
         temp_password=temp_password,
@@ -392,7 +425,18 @@ def _send_employee_credentials_email(
         intro=intro,
         heading=heading,
     )
-    return send_email(to_email, subject, plain, html_body=html_body)
+    ov = smtp_override or {}
+    return send_email(
+        to_email,
+        subject,
+        plain,
+        html_body=html_body,
+        smtp_host=ov.get("smtp_host") if ov else None,  # type: ignore[arg-type]
+        smtp_port=ov.get("smtp_port") if ov else None,  # type: ignore[arg-type]
+        smtp_user=ov.get("smtp_user") if ov else None,  # type: ignore[arg-type]
+        smtp_password=ov.get("smtp_password") if ov else None,  # type: ignore[arg-type]
+        smtp_from=ov.get("smtp_from") if ov else None,  # type: ignore[arg-type]
+    )
 
 
 def _credentials_whatsapp_text(
@@ -402,7 +446,7 @@ def _credentials_whatsapp_text(
     invite_url: str,
 ) -> str:
     return (
-        "Доступ к CRM MetodiOne\n\n"
+        "Доступ к CRM-DN\n\n"
         f"Логин: {email}\n"
         f"Пароль: {temp_password}\n"
         f"Вход: {invite_url}\n\n"
@@ -486,7 +530,7 @@ async def _send_employee_credentials_whatsapp(
     phone: str | None,
     email: str,
     temp_password: str,
-    invite_token: str,
+    invite_url: str,
     prefer_pipeline_ids: list[int] | None = None,
 ) -> tuple[bool, str | None]:
     digits = whatsapp_e164_digits(phone or "")
@@ -502,7 +546,7 @@ async def _send_employee_credentials_whatsapp(
     text = _credentials_whatsapp_text(
         email=email,
         temp_password=temp_password,
-        invite_url=_build_invite_url(invite_token),
+        invite_url=invite_url,
     )
     ok, err, _ = await send_green_text_async(integ.config, f"{digits}@c.us", text)
     if not ok:
@@ -664,6 +708,7 @@ async def create_payroll_employee(
 @router.post("/invite", response_model=InviteEmployeeResult, status_code=status.HTTP_201_CREATED)
 async def invite_employee(
     body: InviteEmployeeBody,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: CurrentUser,
     company_id: CurrentCompanyId,
@@ -707,7 +752,7 @@ async def invite_employee(
         if set(body.pipeline_ids) != ok:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown pipeline_id in list")
 
-    _invite_app_base()
+    _invite_app_base(request)
 
     existing_by_email = (
         await db.execute(select(User).where(User.company_id == company_id, User.email == email).limit(1))
@@ -821,19 +866,21 @@ async def invite_employee(
                 course_stream_gap_days=body.course_stream_gap_days,
             )
 
-    invite_url = _build_invite_url(invite_token)
-    intro = "Вам восстановили доступ к CRM." if rehire else "Вас пригласили в CRM MetodiOne."
+    invite_url = _build_invite_url(invite_token, request)
+    intro = "Вам восстановили доступ к CRM-DN." if rehire else "Вас пригласили в CRM-DN."
     emp = await _employee_read(db, u)
-    # Оба канала параллельно: письмо (SMTP) + WhatsApp (Green API).
+    smtp_ov = await _company_smtp_override(db, company_id)
+    # Оба канала параллельно: письмо (SMTP / Gmail интеграция) + WhatsApp (Green API).
     (email_sent, email_err), (wa_sent, wa_err) = await asyncio.gather(
         asyncio.to_thread(
             _send_employee_credentials_email,
             email,
             temp_password,
-            invite_token,
+            invite_url,
             intro=intro,
-            subject="Приглашение в CRM MetodiOne",
-            heading="Приглашение в CRM",
+            subject="Приглашение в CRM-DN",
+            heading="Приглашение в CRM-DN",
+            smtp_override=smtp_ov,
         ),
         _send_employee_credentials_whatsapp(
             db,
@@ -841,7 +888,7 @@ async def invite_employee(
             phone=phone,
             email=email,
             temp_password=temp_password,
-            invite_token=invite_token,
+            invite_url=invite_url,
             prefer_pipeline_ids=emp.pipeline_ids,
         ),
     )
@@ -1125,17 +1172,19 @@ async def patch_employee_contact(
                 conflict.email = f"fired-{conflict.id}@inactive.local"
                 await db.flush()
 
-            _invite_app_base()
             temp_password = _rand_password()
             invite_token = secrets.token_urlsafe(32)
-            intro = "Для вашего аккаунта в CRM изменён email. Используйте новые данные для входа."
+            invite_url = _build_invite_url(invite_token)
+            intro = "Для вашего аккаунта в CRM-DN изменён email. Используйте новые данные для входа."
+            smtp_ov = await _company_smtp_override(db, company_id)
             credentials_sent, mail_err = _send_employee_credentials_email(
                 normalized,
                 temp_password,
-                invite_token,
+                invite_url,
                 intro=intro,
-                subject="Новый логин для CRM",
-                heading="Смена email в CRM",
+                subject="Новый логин для CRM-DN",
+                heading="Смена email в CRM-DN",
+                smtp_override=smtp_ov,
             )
             if not credentials_sent:
                 raise HTTPException(
@@ -1375,6 +1424,7 @@ async def post_employee_pipelines(
 @router.post("/{employee_id}/resend-credentials", response_model=ResendCredentialsResult)
 async def resend_employee_credentials(
     employee_id: int,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: CurrentUser,
     company_id: CurrentCompanyId,
@@ -1391,7 +1441,7 @@ async def resend_employee_credentials(
             detail="Нельзя сбросить пароль другого владельца",
         )
 
-    _invite_app_base()
+    _invite_app_base(request)
     temp_password = _rand_password()
     invite_token = secrets.token_urlsafe(32)
     target.hashed_password = hash_password(temp_password)
@@ -1399,14 +1449,17 @@ async def resend_employee_credentials(
     target.must_change_password = True
     await db.flush()
 
-    intro = "Вам повторно выслан доступ к CRM. Используйте новые данные для входа."
+    invite_url = _build_invite_url(invite_token, request)
+    intro = "Вам повторно выслан доступ к CRM-DN. Используйте новые данные для входа."
+    smtp_ov = await _company_smtp_override(db, company_id)
     email_sent, email_err = _send_employee_credentials_email(
         target.email,
         temp_password,
-        invite_token,
+        invite_url,
         intro=intro,
-        subject="Повторный доступ к CRM",
+        subject="Повторный доступ к CRM-DN",
         heading="Логин и пароль",
+        smtp_override=smtp_ov,
     )
 
     emp = await _employee_read(db, target)
@@ -1416,7 +1469,7 @@ async def resend_employee_credentials(
         phone=target.phone,
         email=target.email,
         temp_password=temp_password,
-        invite_token=invite_token,
+        invite_url=invite_url,
         prefer_pipeline_ids=emp.pipeline_ids,
     )
 
