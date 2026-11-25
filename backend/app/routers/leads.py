@@ -1294,6 +1294,18 @@ class LeadRedistributeEqualBody(BaseModel):
         default=False,
         description="Также включить лиды без менеджера",
     )
+    only_uncontacted: bool = Field(
+        default=True,
+        description="Только лиды без исходящих сообщений менеджера (с кем не говорили)",
+    )
+    exclude_sold: bool = Field(
+        default=True,
+        description="Не трогать Удачно/Отказ и лиды с KPI-продажей",
+    )
+    restore_protected: bool = Field(
+        default=True,
+        description="Сначала вернуть ошибочно ушедшие «проданные/общались» на прежнего менеджера",
+    )
 
 
 class LeadRedistributeResult(BaseModel):
@@ -1581,9 +1593,18 @@ async def redistribute_leads_equal_among_managers(
     current_user: CurrentUser,
     company_id: CurrentCompanyId,
 ) -> LeadRedistributeResult:
-    """Равномерно раздать лиды между выбранными менеджерами (например Начиб + Муниса)."""
+    """Равномерно раздать лиды между менеджерами.
+
+    По умолчанию: только «молчаливые» (менеджер не писал) и без продаж/Удачно/Отказ.
+    Проданные и те, с кем уже общались — не трогаем; ошибочно ушедшие возвращаем.
+    """
     if not _is_lead_redistribution_admin(current_user.role):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Только владелец или админ воронки")
+
+    from app.services.lead_equal_redistribute import (
+        restore_protected_from_equal_moves,
+        selectable_silent_leads,
+    )
 
     target_ids: list[int] = []
     seen: set[int] = set()
@@ -1597,18 +1618,50 @@ async def redistribute_leads_equal_among_managers(
     if len(target_ids) < 2:
         raise HTTPException(status_code=400, detail="Нужны минимум два разных менеджера")
 
-    filters = [Lead.company_id == company_id]
-    if body.include_unassigned:
-        filters.append(or_(Lead.manager_id.in_(target_ids), Lead.manager_id.is_(None)))
-    else:
-        filters.append(Lead.manager_id.in_(target_ids))
-
-    lead_rows = (
-        await db.execute(
-            select(Lead.id, Lead.manager_id).where(*filters).order_by(Lead.id.asc()),
+    restored_n = 0
+    if body.restore_protected and (body.only_uncontacted or body.exclude_sold):
+        restored_n, restored_moves = await restore_protected_from_equal_moves(
+            db,
+            company_id=company_id,
+            target_ids=target_ids,
         )
-    ).all()
-    if not lead_rows:
+        for lid, from_mid, to_mid in restored_moves:
+            await _audit_lead(
+                db,
+                lead_id=int(lid),
+                action="manager_reassigned",
+                current_user=current_user,
+                details=(
+                    f"from_manager_id={to_mid}, to_manager_id={from_mid} "
+                    f"(redistribute-equal-restore-protected)"
+                ),
+            )
+
+    if body.only_uncontacted or body.exclude_sold:
+        lead_rows = await selectable_silent_leads(
+            db,
+            company_id=company_id,
+            target_ids=target_ids,
+            include_unassigned=body.include_unassigned,
+        )
+    else:
+        filters = [Lead.company_id == company_id]
+        if body.include_unassigned:
+            filters.append(or_(Lead.manager_id.in_(target_ids), Lead.manager_id.is_(None)))
+        else:
+            filters.append(Lead.manager_id.in_(target_ids))
+        lead_rows = list(
+            (
+                await db.execute(
+                    select(Lead.id, Lead.manager_id).where(*filters).order_by(Lead.id.asc()),
+                )
+            ).all(),
+        )
+        lead_rows = [
+            (int(lid), int(mid) if mid is not None else None) for lid, mid in lead_rows
+        ]
+
+    if not lead_rows and restored_n == 0:
         return LeadRedistributeResult(total=0, reassigned=0, per_manager={tid: 0 for tid in target_ids})
 
     per_manager: dict[int, int] = {tid: 0 for tid in target_ids}
@@ -1620,7 +1673,11 @@ async def redistribute_leads_equal_among_managers(
         entity_id=0,
         action="leads_redistributed_equal",
         current_user=current_user,
-        details=f"targets={target_ids}, total={total}, per_manager={{}}",
+        details=(
+            f"targets={target_ids}, total={total}, restored_protected={restored_n}, "
+            f"only_uncontacted={body.only_uncontacted}, exclude_sold={body.exclude_sold}, "
+            f"per_manager={{}}"
+        ),
     )
     batch_id = int(batch.id)
 
@@ -1666,14 +1723,28 @@ async def redistribute_leads_equal_among_managers(
                 .values(assigned_to=new_mid),
             )
 
+    # Итоговые counts по всем лидам менеджеров (не только silent pool)
+    final_counts: dict[int, int] = {tid: 0 for tid in target_ids}
+    count_rows = (
+        await db.execute(
+            select(Lead.manager_id, func.count(Lead.id))
+            .where(Lead.company_id == company_id, Lead.manager_id.in_(target_ids))
+            .group_by(Lead.manager_id),
+        )
+    ).all()
+    for mid, cnt in count_rows:
+        if mid is not None:
+            final_counts[int(mid)] = int(cnt)
+
     batch.details = (
-        f"targets={target_ids}, total={sum(per_manager.values())}, "
-        f"changed={changed}, per_manager={per_manager}"
+        f"targets={target_ids}, silent_total={total}, changed={changed}, "
+        f"restored_protected={restored_n}, silent_per_manager={per_manager}, "
+        f"final_per_manager={final_counts}"
     )
     await db.flush()
     await db.commit()
 
-    for tid, cnt in per_manager.items():
+    for tid, cnt in final_counts.items():
         if cnt <= 0:
             continue
         await _notify_users(
@@ -1681,10 +1752,17 @@ async def redistribute_leads_equal_among_managers(
             company_id=company_id,
             user_ids=[tid],
             title="Лиды распределены поровну",
-            description=f"После равной раздачи у вас лидов: {cnt}.",
+            description=(
+                f"Молчаливые лиды раздали поровну; проданные и с перепиской не трогали. "
+                f"Сейчас у вас лидов: {cnt}."
+            ),
         )
 
-    return LeadRedistributeResult(total=sum(per_manager.values()), reassigned=changed, per_manager=per_manager)
+    return LeadRedistributeResult(
+        total=sum(final_counts.values()),
+        reassigned=changed + restored_n,
+        per_manager=final_counts,
+    )
 
 
 @router.post("/redistribute-from-owners", response_model=LeadRedistributeResult)

@@ -17,7 +17,11 @@ _RE_SYS_FROM = re.compile(r"\bfrom=(\d+)\b")
 _RE_SYS_TOTAL = re.compile(r"\btotal=(\d+)\b")
 _RE_UNDONE = re.compile(r"undone_audit_id=(\d+)")
 
-REDISTRIBUTE_ACTIONS = ("leads_redistributed", "leads_redistributed_from_owners")
+REDISTRIBUTE_ACTIONS = (
+    "leads_redistributed",
+    "leads_redistributed_from_owners",
+    "leads_redistributed_equal",
+)
 
 
 def parse_manager_move(details: str | None) -> tuple[int | None, int | None, int | None]:
