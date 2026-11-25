@@ -1345,213 +1345,214 @@ async def _service_earning_detail(
     if direction_ids:
         named_dirs |= {int(d) for d in direction_ids}
 
-    # KPI-продажи: владелец = лид / ФИО в CRM / открывший. Без ручной связи продажи.
-    if (source_type or "manual") != "direction":
-        fio_owners = await load_fio_crm_owner_managers(
-            db, company_id=company_id, pipeline_id=pipeline_id,
+    # KPI/пакетные продажи (в т.ч. Интенсив с source_type=direction):
+    # список как у «Курс 15» — клиент, сумма, оплата, статус. Раньше direction
+    # пропускал SalesKpiManualSale → модалка «Нет продаж» при ненулевом Привёл.
+    fio_owners = await load_fio_crm_owner_managers(
+        db, company_id=company_id, pipeline_id=pipeline_id,
+    )
+    sale_rows = (
+        await db.execute(
+            select(SalesKpiManualSale, SalesKpiPlanItem.name, Lead.manager_id)
+            .join(SalesKpiPlanItem, SalesKpiPlanItem.id == SalesKpiManualSale.plan_item_id)
+            .join(Lead, Lead.id == SalesKpiManualSale.lead_id, isouter=True)
+            .where(
+                SalesKpiManualSale.company_id == company_id,
+                SalesKpiManualSale.pipeline_id == pipeline_id,
+                SalesKpiManualSale.paid_amount > 0,
+                SalesKpiManualSale.status != "refused",
+            )
+            .order_by(SalesKpiManualSale.sold_at.desc()),
         )
-        sale_rows = (
+    ).all()
+    sale_ids = [int(s.id) for s, pname, _lm in sale_rows if _norm_kpi_label(str(pname or "")) == label]
+    pays_by_sale: dict[int, list[tuple[datetime, Decimal, int]]] = {}
+    if sale_ids:
+        pay_rows = (
             await db.execute(
-                select(SalesKpiManualSale, SalesKpiPlanItem.name, Lead.manager_id)
-                .join(SalesKpiPlanItem, SalesKpiPlanItem.id == SalesKpiManualSale.plan_item_id)
+                select(
+                    SalesKpiManualSalePayment.sale_id,
+                    SalesKpiManualSalePayment.amount,
+                    SalesKpiManualSalePayment.paid_at,
+                    SalesKpiManualSale.opened_manager_user_id,
+                    SalesKpiManualSale.manager_user_id,
+                    Lead.manager_id,
+                    SalesKpiManualSale.client_name,
+                )
+                .join(SalesKpiManualSale, SalesKpiManualSale.id == SalesKpiManualSalePayment.sale_id)
                 .join(Lead, Lead.id == SalesKpiManualSale.lead_id, isouter=True)
                 .where(
-                    SalesKpiManualSale.company_id == company_id,
-                    SalesKpiManualSale.pipeline_id == pipeline_id,
-                    SalesKpiManualSale.paid_amount > 0,
-                    SalesKpiManualSale.status != "refused",
+                    SalesKpiManualSalePayment.sale_id.in_(sale_ids),
+                    SalesKpiManualSalePayment.amount > 0,
+                    SalesKpiManualSalePayment.confirmed_at.is_not(None),
+                    SalesKpiManualSalePayment.rejected_at.is_(None),
+                    SalesKpiManualSalePayment.paid_at.is_not(None),
                 )
-                .order_by(SalesKpiManualSale.sold_at.desc()),
+                .order_by(SalesKpiManualSalePayment.paid_at.asc(), SalesKpiManualSalePayment.id.asc()),
             )
         ).all()
-        sale_ids = [int(s.id) for s, pname, _lm in sale_rows if _norm_kpi_label(str(pname or "")) == label]
-        pays_by_sale: dict[int, list[tuple[datetime, Decimal, int]]] = {}
-        if sale_ids:
-            pay_rows = (
-                await db.execute(
-                    select(
-                        SalesKpiManualSalePayment.sale_id,
-                        SalesKpiManualSalePayment.amount,
-                        SalesKpiManualSalePayment.paid_at,
-                        SalesKpiManualSale.opened_manager_user_id,
-                        SalesKpiManualSale.manager_user_id,
-                        Lead.manager_id,
-                        SalesKpiManualSale.client_name,
-                    )
-                    .join(SalesKpiManualSale, SalesKpiManualSale.id == SalesKpiManualSalePayment.sale_id)
-                    .join(Lead, Lead.id == SalesKpiManualSale.lead_id, isouter=True)
-                    .where(
-                        SalesKpiManualSalePayment.sale_id.in_(sale_ids),
-                        SalesKpiManualSalePayment.amount > 0,
-                        SalesKpiManualSalePayment.confirmed_at.is_not(None),
-                        SalesKpiManualSalePayment.rejected_at.is_(None),
-                        SalesKpiManualSalePayment.paid_at.is_not(None),
-                    )
-                    .order_by(SalesKpiManualSalePayment.paid_at.asc(), SalesKpiManualSalePayment.id.asc()),
-                )
-            ).all()
-            for sale_id, amount, paid_at, opened_mid, sale_mid, lead_mid, client_name in pay_rows:
-                fk = fio_key(str(client_name or ""))
-                mid = kpi_client_owner_manager_id(
-                    opened_manager_id=int(opened_mid) if opened_mid is not None else None,
-                    sale_manager_id=int(sale_mid) if sale_mid is not None else None,
-                    lead_manager_id=int(lead_mid) if lead_mid is not None else None,
-                    fio_crm_manager_id=fio_owners.get(fk) if fk else None,
-                    client_name=str(client_name or ""),
-                )
-                if sale_id is None or mid is None or paid_at is None:
-                    continue
-                at = paid_at if paid_at.tzinfo else paid_at.replace(tzinfo=UTC)
-                board_mid = payment_manager_on_board(
-                    owner_id=int(mid),
-                    sale_manager_id=int(sale_mid) if sale_mid is not None else None,
-                    paid_at=at,
-                    active_manager_ids=active_manager_ids,
-                )
-                pays_by_sale.setdefault(int(sale_id), []).append(
-                    (at, Decimal(str(amount or 0)).quantize(Decimal("0.01")), int(board_mid)),
-                )
-
-        for sale, pname, lead_mid in sale_rows:
-            if _norm_kpi_label(str(pname or "")) != label:
-                continue
-            fk = fio_key(str(sale.client_name or ""))
-            owner_mid = kpi_client_owner_manager_id(
-                opened_manager_id=int(sale.opened_manager_user_id)
-                if sale.opened_manager_user_id is not None
-                else None,
-                sale_manager_id=int(sale.manager_user_id) if sale.manager_user_id is not None else None,
+        for sale_id, amount, paid_at, opened_mid, sale_mid, lead_mid, client_name in pay_rows:
+            fk = fio_key(str(client_name or ""))
+            mid = kpi_client_owner_manager_id(
+                opened_manager_id=int(opened_mid) if opened_mid is not None else None,
+                sale_manager_id=int(sale_mid) if sale_mid is not None else None,
                 lead_manager_id=int(lead_mid) if lead_mid is not None else None,
                 fio_crm_manager_id=fio_owners.get(fk) if fk else None,
-                client_name=str(sale.client_name or ""),
+                client_name=str(client_name or ""),
             )
-            if kpi_client_excluded_from_brought(str(sale.client_name or "")):
+            if sale_id is None or mid is None or paid_at is None:
                 continue
-            price = Decimal(str(sale.service_amount or 0)).quantize(Decimal("0.01"))
-            paid = Decimal(str(sale.paid_amount or 0)).quantize(Decimal("0.01"))
-            force = course_brought_force_entry(ym=ym, client_name=str(sale.client_name or ""))
-            force_mid: int | None = None
-            if force is not None and is_main_course_product(item.name) and paid >= force[1]:
-                force_mid = await resolve_course_brought_force_manager_id(
-                    db, company_id=company_id, spec=force[0],
-                )
-            force_for_me = force_mid is not None and int(force_mid) == int(manager_id)
-            # Разовый зачёт другому менеджеру — строку у открывшего не показываем.
-            if force_mid is not None and not force_for_me:
-                continue
-            board_owner = sale_board_manager_id(
-                owner_id=owner_mid,
-                sale_manager_id=int(sale.manager_user_id) if sale.manager_user_id is not None else None,
-                ym=ym,
+            at = paid_at if paid_at.tzinfo else paid_at.replace(tzinfo=UTC)
+            board_mid = payment_manager_on_board(
+                owner_id=int(mid),
+                sale_manager_id=int(sale_mid) if sale_mid is not None else None,
+                paid_at=at,
                 active_manager_ids=active_manager_ids,
             )
-            if board_owner != manager_id and not force_for_me:
+            pays_by_sale.setdefault(int(sale_id), []).append(
+                (at, Decimal(str(amount or 0)).quantize(Decimal("0.01")), int(board_mid)),
+            )
+
+    for sale, pname, lead_mid in sale_rows:
+        if _norm_kpi_label(str(pname or "")) != label:
+            continue
+        fk = fio_key(str(sale.client_name or ""))
+        owner_mid = kpi_client_owner_manager_id(
+            opened_manager_id=int(sale.opened_manager_user_id)
+            if sale.opened_manager_user_id is not None
+            else None,
+            sale_manager_id=int(sale.manager_user_id) if sale.manager_user_id is not None else None,
+            lead_manager_id=int(lead_mid) if lead_mid is not None else None,
+            fio_crm_manager_id=fio_owners.get(fk) if fk else None,
+            client_name=str(sale.client_name or ""),
+        )
+        if kpi_client_excluded_from_brought(str(sale.client_name or "")):
+            continue
+        price = Decimal(str(sale.service_amount or 0)).quantize(Decimal("0.01"))
+        paid = Decimal(str(sale.paid_amount or 0)).quantize(Decimal("0.01"))
+        force = course_brought_force_entry(ym=ym, client_name=str(sale.client_name or ""))
+        force_mid: int | None = None
+        if force is not None and is_main_course_product(item.name) and paid >= force[1]:
+            force_mid = await resolve_course_brought_force_manager_id(
+                db, company_id=company_id, spec=force[0],
+            )
+        force_for_me = force_mid is not None and int(force_mid) == int(manager_id)
+        # Разовый зачёт другому менеджеру — строку у открывшего не показываем.
+        if force_mid is not None and not force_for_me:
+            continue
+        board_owner = sale_board_manager_id(
+            owner_id=owner_mid,
+            sale_manager_id=int(sale.manager_user_id) if sale.manager_user_id is not None else None,
+            ym=ym,
+            active_manager_ids=active_manager_ids,
+        )
+        if board_owner != manager_id and not force_for_me:
+            continue
+        is_new = sale.sold_at is not None and start <= sale.sold_at < end and paid > 0
+        payments = pays_by_sale.get(int(sale.id), [])
+        brought_amt = Decimal("0.00")
+        month_paid_amt = Decimal("0.00")
+        for paid_at, amt, mid in payments:
+            if mid != manager_id and not force_for_me:
                 continue
-            is_new = sale.sold_at is not None and start <= sale.sold_at < end and paid > 0
-            payments = pays_by_sale.get(int(sale.id), [])
-            brought_amt = Decimal("0.00")
-            month_paid_amt = Decimal("0.00")
-            for paid_at, amt, mid in payments:
-                if mid != manager_id and not force_for_me:
+            if paid_at < start or paid_at >= end:
+                continue
+            pay = Decimal(str(amt or 0)).quantize(Decimal("0.01"))
+            if pay > 0:
+                month_paid_amt = (month_paid_amt + pay).quantize(Decimal("0.01"))
+        if is_main_course_product(item.name):
+            for paid_at, mid, credit in course_stage_credits_for_payments(
+                service_amount=price,
+                payments=payments,
+            ):
+                if mid != manager_id:
                     continue
                 if paid_at < start or paid_at >= end:
                     continue
-                pay = Decimal(str(amt or 0)).quantize(Decimal("0.01"))
-                if pay > 0:
-                    month_paid_amt = (month_paid_amt + pay).quantize(Decimal("0.01"))
-            if is_main_course_product(item.name):
-                for paid_at, mid, credit in course_stage_credits_for_payments(
-                    service_amount=price,
-                    payments=payments,
-                ):
-                    if mid != manager_id:
-                        continue
-                    if paid_at < start or paid_at >= end:
-                        continue
-                    brought_amt += credit
-                brought_amt = course_brought_month_override(
-                    ym=ym,
-                    client_name=str(sale.client_name or ""),
-                    computed=brought_amt,
-                )
-                if force_for_me and force is not None:
-                    # Разово: доплата в Привёл (не Новых). force=0 — строка видна, в зачёт не входит.
-                    brought_amt = force[1]
-                    if month_paid_amt < force[1]:
-                        month_paid_amt = force[1]
-                    is_new = False
-            elif protocol_brought_waits_for_full_price(item.name):
-                for paid_at, mid, credit in protocol_full_pay_credits_for_payments(
-                    service_amount=price,
-                    payments=payments,
-                ):
-                    if mid != manager_id:
-                        continue
-                    if paid_at < start or paid_at >= end:
-                        continue
-                    brought_amt += credit
-            else:
-                for paid_at, amt, mid in payments:
-                    if mid != manager_id:
-                        continue
-                    if paid_at < start or paid_at >= end:
-                        continue
-                    brought_amt += amt
-
-            # Продажа без строк журнала: legacy — вся оплата в месяц sold_at у владельца
-            if not payments and is_new and paid > 0:
-                month_paid_amt = paid
-                if is_main_course_product(item.name):
-                    brought_amt = course_brought_from_gross(price, paid)
-                elif protocol_brought_waits_for_full_price(item.name):
-                    brought_amt = paid if is_full_payment(price, paid) else Decimal("0.00")
-                else:
-                    brought_amt = paid if is_full_payment(price, paid) else Decimal("0.00")
-
-            # Неполная / ниже мин. — в списке показываем, в Привёл не кладём.
-            if not is_new and brought_amt <= 0 and month_paid_amt <= 0:
-                continue
-            if is_new and brought_amt <= 0 and month_paid_amt <= 0 and paid <= 0:
-                continue
-            if is_new:
-                if brought_amt > 0:
-                    note = "открыт в месяце"
-                elif is_main_course_product(item.name):
-                    note = "ниже мин. — показано, не в оплату"
-                elif protocol_brought_waits_for_full_price(item.name):
-                    note = "неполная — показано, не в оплату"
-                else:
-                    note = "неполная — показано, не в оплату"
-            elif brought_amt > 0 and protocol_brought_waits_for_full_price(item.name) and brought_amt > month_paid_amt:
-                note = "закрытие цены · вся накопленная сумма"
-            elif brought_amt > 0:
-                note = "этап / доплата в месяце"
-            elif force_for_me and force is not None and force[1] <= 0:
-                note = "не в оплату · не в зачёт"
-            elif protocol_brought_waits_for_full_price(item.name) or is_main_course_product(item.name):
-                note = (
-                    "ниже мин. — показано, не в оплату"
-                    if is_main_course_product(item.name)
-                    else "неполная — показано, не в оплату"
-                )
-            else:
-                note = "показано, не в оплату менеджеру"
-            rows.append(
-                SalesKpiEarningDetailRow(
-                    source="kpi",
-                    source_id=int(sale.id),
-                    client_name=str(sale.client_name or ""),
-                    service_amount=price,
-                    paid_amount=paid,
-                    pay_status=_pay_status(price, paid),
-                    sold_at=sale.sold_at,
-                    in_brought=brought_amt > 0,
-                    brought_amount=brought_amt.quantize(Decimal("0.01")),
-                    month_paid_amount=month_paid_amt.quantize(Decimal("0.01")),
-                    is_new=is_new,
-                    note=note,
-                ),
+                brought_amt += credit
+            brought_amt = course_brought_month_override(
+                ym=ym,
+                client_name=str(sale.client_name or ""),
+                computed=brought_amt,
             )
+            if force_for_me and force is not None:
+                # Разово: доплата в Привёл (не Новых). force=0 — строка видна, в зачёт не входит.
+                brought_amt = force[1]
+                if month_paid_amt < force[1]:
+                    month_paid_amt = force[1]
+                is_new = False
+        elif protocol_brought_waits_for_full_price(item.name):
+            for paid_at, mid, credit in protocol_full_pay_credits_for_payments(
+                service_amount=price,
+                payments=payments,
+            ):
+                if mid != manager_id:
+                    continue
+                if paid_at < start or paid_at >= end:
+                    continue
+                brought_amt += credit
+        else:
+            for paid_at, amt, mid in payments:
+                if mid != manager_id:
+                    continue
+                if paid_at < start or paid_at >= end:
+                    continue
+                brought_amt += amt
+
+        # Продажа без строк журнала: legacy — вся оплата в месяц sold_at у владельца
+        if not payments and is_new and paid > 0:
+            month_paid_amt = paid
+            if is_main_course_product(item.name):
+                brought_amt = course_brought_from_gross(price, paid)
+            elif protocol_brought_waits_for_full_price(item.name):
+                brought_amt = paid if is_full_payment(price, paid) else Decimal("0.00")
+            else:
+                brought_amt = paid if is_full_payment(price, paid) else Decimal("0.00")
+
+        # Неполная / ниже мин. — в списке показываем, в Привёл не кладём.
+        if not is_new and brought_amt <= 0 and month_paid_amt <= 0:
+            continue
+        if is_new and brought_amt <= 0 and month_paid_amt <= 0 and paid <= 0:
+            continue
+        if is_new:
+            if brought_amt > 0:
+                note = "открыт в месяце"
+            elif is_main_course_product(item.name):
+                note = "ниже мин. — показано, не в оплату"
+            elif protocol_brought_waits_for_full_price(item.name):
+                note = "неполная — показано, не в оплату"
+            else:
+                note = "неполная — показано, не в оплату"
+        elif brought_amt > 0 and protocol_brought_waits_for_full_price(item.name) and brought_amt > month_paid_amt:
+            note = "закрытие цены · вся накопленная сумма"
+        elif brought_amt > 0:
+            note = "этап / доплата в месяце"
+        elif force_for_me and force is not None and force[1] <= 0:
+            note = "не в оплату · не в зачёт"
+        elif protocol_brought_waits_for_full_price(item.name) or is_main_course_product(item.name):
+            note = (
+                "ниже мин. — показано, не в оплату"
+                if is_main_course_product(item.name)
+                else "неполная — показано, не в оплату"
+            )
+        else:
+            note = "показано, не в оплату менеджеру"
+        rows.append(
+            SalesKpiEarningDetailRow(
+                source="kpi",
+                source_id=int(sale.id),
+                client_name=str(sale.client_name or ""),
+                service_amount=price,
+                paid_amount=paid,
+                pay_status=_pay_status(price, paid),
+                sold_at=sale.sold_at,
+                in_brought=brought_amt > 0,
+                brought_amount=brought_amt.quantize(Decimal("0.01")),
+                month_paid_amount=month_paid_amt.quantize(Decimal("0.01")),
+                is_new=is_new,
+                note=note,
+            ),
+        )
 
     # Запись месяца: владелец карточки CRM; если уже есть KPI на то же ФИО+услугу — визит не дублируем.
     if named_dirs or (source_type or "") == "direction":
