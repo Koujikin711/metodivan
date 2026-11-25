@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import errno
 import logging
+import secrets
 import shutil
+import time
 from pathlib import Path
 import re
 
@@ -252,3 +254,63 @@ def resolve_chat_media(message_id: int) -> Path | None:
         if matches:
             return matches[0]
     return None
+
+
+def _temp_outbound_dir() -> Path:
+    d = chat_media_directory() / "outbound-temp"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def save_temp_outbound_media(
+    content: bytes,
+    filename: str | None,
+    *,
+    mime: str | None = None,
+) -> tuple[str, str] | None:
+    """Временный файл для Green sendFileByUrl. Возвращает (token, filename) или None."""
+    if not content:
+        return None
+    token = secrets.token_urlsafe(24)
+    ext = _normalize_ext(filename, mime)
+    safe_name = f"voice{ext}" if (filename or "").lower().startswith("voice") else f"file{ext}"
+    target = _temp_outbound_dir() / f"{token}{ext}"
+    # meta рядом — имя файла для Content-Disposition
+    meta = _temp_outbound_dir() / f"{token}.name"
+    needed = len(content) + _FREE_RESERVE_BYTES
+    ensure_chat_media_room(needed)
+    err = _try_write(target, content)
+    if err is not None:
+        return None
+    try:
+        meta.write_text(safe_name, encoding="utf-8")
+    except OSError:
+        pass
+    return token, safe_name
+
+
+def resolve_temp_outbound_media(token: str) -> tuple[Path, str] | None:
+    """Находит временный исходящий файл по токену (без auth — Green качает по URL)."""
+    raw = (token or "").strip()
+    if not raw or len(raw) < 16 or "/" in raw or ".." in raw:
+        return None
+    folder = _temp_outbound_dir()
+    matches = sorted(folder.glob(f"{raw}.*"))
+    path = next((p for p in matches if p.suffix.lower() != ".name"), None)
+    if path is None or not path.is_file():
+        return None
+    # старше 2 часов — не отдаём
+    try:
+        age = time.time() - path.stat().st_mtime
+        if age > 2 * 3600:
+            return None
+    except OSError:
+        return None
+    name = path.name
+    meta = folder / f"{raw}.name"
+    if meta.is_file():
+        try:
+            name = meta.read_text(encoding="utf-8").strip() or name
+        except OSError:
+            pass
+    return path, name

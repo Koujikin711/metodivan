@@ -37,7 +37,8 @@ from app.models import (
 
 _INTEGRATION_CLOSE_DEAL_TYPE = "integration_close"
 from app.services.audio_prepare import prepare_file_for_green_whatsapp
-from app.services.chat_media_store import resolve_chat_media, save_outgoing_chat_media
+from app.services.chat_media_store import resolve_chat_media, resolve_temp_outbound_media, save_outgoing_chat_media
+from app.services.green_api_settings import resolve_public_api_base
 from app.services.chat_thread_state import touch_thread_on_message
 from app.services.green_incoming_media import (
     apply_downloaded_chat_media,
@@ -612,6 +613,7 @@ async def _send_green_file_message(
     filename: str,
     file_content_type: str | None,
     caption: str,
+    public_base_url: str | None = None,
 ) -> ChatMessageRead:
     from app.services.chat_outbound_policy import outbound_message_allowed
 
@@ -645,6 +647,7 @@ async def _send_green_file_message(
         filename or "file",
         caption or "",
         mime=file_content_type,
+        public_base_url=public_base_url,
     )
     if not ok:
         msg = ChatMessage(
@@ -660,7 +663,8 @@ async def _send_green_file_message(
         db.add(msg)
         touch_thread_on_message(thread, "out")
         await db.flush()
-        d = f"Send failed: {err}"
+        detail = (err or "").strip() or "Green media недоступен; WhatsApp QR не подключён"
+        d = f"Send failed: {detail}"
         logger.warning("chat green upload failed thread=%s detail=%s", thread.id, d[:800])
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=d)
     mtype = "document"
@@ -1564,6 +1568,17 @@ async def list_messages(
     return [_msg_read(m) for m in rows_chronological]
 
 
+@router.get("/outbound-temp/{token}")
+async def get_outbound_temp_media(token: str):
+    """Временный исходящий файл для Green sendFileByUrl (без auth — качает Green по URL)."""
+    found = resolve_temp_outbound_media(token)
+    if found is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Temp media not found")
+    fpath, filename = found
+    media_type = mimetypes.guess_type(filename)[0] or mimetypes.guess_type(fpath.name)[0] or "application/octet-stream"
+    return FileResponse(path=fpath, media_type=media_type, filename=filename)
+
+
 @router.get("/messages/{message_id}/media")
 async def get_message_media(
     message_id: int,
@@ -1717,6 +1732,7 @@ async def send_message_location(
 @router.post("/threads/{thread_id}/messages/attachment", response_model=ChatMessageRead)
 async def send_message_attachment(
     thread_id: int,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: CurrentUser,
     company_id: CurrentCompanyId,
@@ -1738,6 +1754,7 @@ async def send_message_attachment(
         )
     thread, cfg, chat_id = await _resolve_green_send(db, thread_id, company_id, current_user)
     caption = (text or "").strip()
+    pub = resolve_public_api_base(request, settings.public_api_base_url)
     return await _send_green_file_message(
         db,
         thread=thread,
@@ -1748,6 +1765,7 @@ async def send_message_attachment(
         filename=file.filename or "file",
         file_content_type=file.content_type,
         caption=caption,
+        public_base_url=pub or None,
     )
 
 
@@ -1797,6 +1815,7 @@ async def send_message(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Вложения из чата пока только для WhatsApp. В Instagram отправьте текст.",
             )
+        pub = resolve_public_api_base(request, settings.public_api_base_url)
         return await _send_green_file_message(
             db,
             thread=thread,
@@ -1807,6 +1826,7 @@ async def send_message(
             filename=filename or "file",
             file_content_type=file_content_type,
             caption=caption,
+            public_base_url=pub or None,
         )
     if file_attempted:
         logger.warning(

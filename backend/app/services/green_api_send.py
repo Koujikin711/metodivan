@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
 import httpx
 
+from app.config import settings
 from app.services.green_api_settings import green_api_base_from_config, green_media_base_from_config
+
+logger = logging.getLogger(__name__)
 
 
 def _via_qr_file(
@@ -26,8 +30,8 @@ def _via_qr_file(
     if ok:
         return True, None, mid
     if not down:
-        return False, err or green_error, None
-    return False, green_error, None
+        return False, err or green_error or "Не удалось отправить файл", None
+    return False, green_error or err or "WhatsApp QR не подключён и Green media недоступен", None
 
 
 def _via_qr_text(chat_id: str, text: str, green_error: str) -> tuple[bool, str | None, str | None]:
@@ -140,6 +144,78 @@ def _upload_mime(filename: str, mime: str | None) -> str | None:
     return None
 
 
+def _is_voice_file(filename: str, mime: str | None) -> bool:
+    upload_mime = _upload_mime(filename, mime) or ""
+    low_name = (filename or "").lower()
+    return upload_mime.startswith("audio/") and (
+        low_name.startswith("voice") or low_name.endswith((".ogg", ".opus", ".webm", ".m4a"))
+    )
+
+
+def _media_host_candidates(cfg: dict, instance_id: str) -> list[str]:
+    hosts: list[str] = []
+    primary = green_media_base_from_config(cfg)
+    if primary:
+        hosts.append(primary.rstrip("/"))
+    # Часто в кабинете: https://7107.media.green-api.com для instance 7107…
+    iid = str(instance_id or "").strip()
+    if len(iid) >= 4 and iid[:4].isdigit():
+        hosts.append(f"https://{iid[:4]}.media.green-api.com")
+    hosts.append("https://media.green-api.com")
+    hosts.append("https://media.greenapi.com")
+    out: list[str] = []
+    seen: set[str] = set()
+    for h in hosts:
+        key = h.rstrip("/").lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(h.rstrip("/"))
+    return out
+
+
+def _exc_detail(exc: BaseException) -> str:
+    name = type(exc).__name__
+    msg = str(exc).strip()
+    if msg:
+        return f"{name}: {msg}"[:400]
+    return name
+
+
+async def _send_file_by_url(
+    *,
+    cfg: dict,
+    instance_id: str,
+    api_token: str,
+    chat_id: str,
+    url_file: str,
+    filename: str,
+    caption: str,
+    is_voice: bool,
+) -> tuple[bool, str | None, str | None]:
+    """sendFileByUrl на apiUrl — работает, когда media-хост с Amvera недоступен."""
+    base = green_api_base_from_config(cfg)
+    url = f"{base}/waInstance{instance_id}/sendFileByUrl/{api_token}"
+    body: dict[str, Any] = {
+        "chatId": chat_id,
+        "urlFile": url_file,
+        "fileName": filename or "file.ogg",
+    }
+    if caption:
+        body["caption"] = caption
+    if is_voice:
+        body["typingType"] = "recording"
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=8.0)) as client:
+            r = await client.post(url, json=body)
+            if r.status_code >= 400:
+                return False, (r.text or f"GREEN sendFileByUrl HTTP {r.status_code}")[:400], None
+            data = r.json() if r.text else {}
+            return True, None, str(data.get("idMessage") or "")
+    except Exception as e:
+        return False, _exc_detail(e), None
+
+
 async def send_green_file_upload(
     config: dict | None,
     chat_id: str,
@@ -147,40 +223,72 @@ async def send_green_file_upload(
     filename: str,
     caption: str,
     mime: str | None = None,
+    *,
+    public_base_url: str | None = None,
 ) -> tuple[bool, str | None, str | None]:
     cfg = config or {}
     instance_id = cfg.get("instance_id") or cfg.get("instanceId")
     api_token = cfg.get("api_token") or cfg.get("apiToken") or cfg.get("apiTokenInstance")
     upload_name = filename or "file"
     upload_mime = _upload_mime(upload_name, mime)
-    low_name = (upload_name or "").lower()
-    is_voice = (upload_mime or "").startswith("audio/") and (
-        low_name.startswith("voice") or low_name.endswith((".ogg", ".opus"))
-    )
+    is_voice = _is_voice_file(upload_name, mime)
     if not instance_id or not api_token:
         return _via_qr_file(
             chat_id, file_bytes, upload_name, caption, upload_mime, "Нет instance_id/api_token в интеграции"
         )
-    media_base = green_media_base_from_config(cfg)
-    url = f"{media_base}/waInstance{instance_id}/sendFileByUpload/{api_token}"
-    # Amvera gateway ~50s: Green media + QR fallback должны уложиться раньше,
-    # иначе клиент видит обрыв и «Отправить» «не работает».
-    green_timeout = httpx.Timeout(20.0, connect=8.0)
+
+    # 1) sendFileByUpload на media-хосты (короткий таймаут — Amvera gateway ~50s).
+    # Несколько хостов подряд съедают бюджет шлюза — пробуем 1–2, затем URL.
+    green_timeout = httpx.Timeout(10.0, connect=4.0)
     green_error = "Green media недоступен"
-    try:
-        async with httpx.AsyncClient(timeout=green_timeout) as client:
-            file_part = (upload_name, file_bytes, upload_mime) if upload_mime else (upload_name, file_bytes)
-            data: dict[str, Any] = {"chatId": chat_id, "fileName": upload_name}
-            if caption:
-                data["caption"] = caption
-            if is_voice:
-                data["typingType"] = "recording"
-            r = await client.post(url, data=data, files={"file": file_part})
-            if r.status_code >= 400:
-                green_error = (r.text or f"GREEN media HTTP {r.status_code}")[:400]
-            else:
+    file_part = (upload_name, file_bytes, upload_mime) if upload_mime else (upload_name, file_bytes)
+    data: dict[str, Any] = {"chatId": chat_id, "fileName": upload_name}
+    if caption:
+        data["caption"] = caption
+    if is_voice:
+        data["typingType"] = "recording"
+
+    hosts = _media_host_candidates(cfg, str(instance_id))[:2]
+    for media_base in hosts:
+        url = f"{media_base}/waInstance{instance_id}/sendFileByUpload/{api_token}"
+        try:
+            async with httpx.AsyncClient(timeout=green_timeout) as client:
+                r = await client.post(url, data=data, files={"file": file_part})
+                if r.status_code >= 400:
+                    green_error = (r.text or f"GREEN media HTTP {r.status_code} @ {media_base}")[:400]
+                    logger.warning("green sendFileByUpload fail host=%s status=%s", media_base, r.status_code)
+                    continue
                 j = r.json() if r.text else {}
                 return True, None, str(j.get("idMessage") or "")
-    except Exception as e:
-        green_error = str(e)[:400]
+        except Exception as e:
+            green_error = f"{_exc_detail(e)} @ {media_base}"
+            logger.warning("green sendFileByUpload error host=%s detail=%s", media_base, green_error)
+
+    # 2) sendFileByUrl через публичный URL CRM (api.green-api.com уже отвечает на текст).
+    pub = (public_base_url or settings.public_api_base_url or "").strip().rstrip("/")
+    if pub:
+        from app.services.chat_media_store import save_temp_outbound_media
+
+        saved = save_temp_outbound_media(file_bytes, upload_name, mime=upload_mime)
+        if saved:
+            token, safe_name = saved
+            url_file = f"{pub}/api/chat/outbound-temp/{token}"
+            ok, err, mid = await _send_file_by_url(
+                cfg=cfg,
+                instance_id=str(instance_id),
+                api_token=str(api_token),
+                chat_id=chat_id,
+                url_file=url_file,
+                filename=safe_name if is_voice else upload_name,
+                caption=caption,
+                is_voice=is_voice,
+            )
+            if ok:
+                return True, None, mid
+            green_error = err or green_error
+            logger.warning("green sendFileByUrl fail detail=%s", green_error)
+        else:
+            green_error = f"{green_error}; не удалось сохранить временный файл для URL"
+
+    # 3) QR / Baileys bridge
     return _via_qr_file(chat_id, file_bytes, upload_name, caption, upload_mime, green_error)
