@@ -34,6 +34,55 @@ def _via_qr_file(
     return False, green_error or err or "WhatsApp QR не подключён и Green media недоступен", None
 
 
+def _combine_send_errors(*parts: str | None) -> str:
+    cleaned = [p.strip() for p in parts if isinstance(p, str) and p.strip()]
+    if not cleaned:
+        return "Не удалось отправить в WhatsApp (Green API и QR-мост недоступны)"
+    # Unique, preserve order
+    out: list[str] = []
+    seen: set[str] = set()
+    for p in cleaned:
+        if p in seen:
+            continue
+        seen.add(p)
+        out.append(p)
+    return " · ".join(out)[:500]
+
+
+def _green_http_error_detail(status_code: int, body: str | None) -> str:
+    raw = (body or "").strip()
+    if not raw:
+        return f"GREEN API HTTP {status_code}"
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return f"GREEN API HTTP {status_code}: {raw[:240]}"
+    if isinstance(data, dict):
+        for key in ("message", "error", "detail", "description"):
+            val = data.get(key)
+            if isinstance(val, str) and val.strip():
+                return f"GREEN API HTTP {status_code}: {val.strip()[:240]}"
+        if data.get("statusCode") and not data.get("idMessage"):
+            return f"GREEN API HTTP {status_code}: {raw[:240]}"
+    return f"GREEN API HTTP {status_code}: {raw[:240]}"
+
+
+def _green_success_or_error(data: Any, raw: str) -> tuple[bool, str | None, str | None]:
+    """Green иногда отвечает 200 без idMessage (ошибка в теле)."""
+    if not isinstance(data, dict):
+        if (raw or "").strip():
+            return False, f"GREEN API: неожиданный ответ {raw[:240]}", None
+        return False, "GREEN API: пустой ответ", None
+    mid = str(data.get("idMessage") or "").strip()
+    if mid:
+        return True, None, mid
+    for key in ("message", "error", "detail", "description"):
+        val = data.get(key)
+        if isinstance(val, str) and val.strip():
+            return False, f"GREEN API: {val.strip()[:240]}", None
+    return False, "GREEN API: нет idMessage в ответе", None
+
+
 def _via_qr_text(chat_id: str, text: str, green_error: str) -> tuple[bool, str | None, str | None]:
     """Если Green API молчит, то же сообщение уходит через QR-сессию Baileys."""
     from app.services.wa_bridge_client import send_text
@@ -41,9 +90,10 @@ def _via_qr_text(chat_id: str, text: str, green_error: str) -> tuple[bool, str |
     ok, err, mid, down = send_text(chat_id, text)
     if ok:
         return True, None, mid
-    if not down:
-        return False, err or green_error, None
-    return False, green_error, None
+    if down:
+        qr_hint = err or "WhatsApp QR не подключён"
+        return False, _combine_send_errors(green_error, qr_hint), None
+    return False, _combine_send_errors(err, green_error), None
 
 
 def send_green_text(config: dict | None, chat_id: str, text: str) -> tuple[bool, str | None, str | None]:
@@ -57,14 +107,18 @@ def send_green_text(config: dict | None, chat_id: str, text: str) -> tuple[bool,
     body = json.dumps({"chatId": chat_id, "message": text}).encode("utf-8")
     req = urlrequest.Request(url, data=body, method="POST", headers={"Content-Type": "application/json"})
     try:
-        with urlrequest.urlopen(req, timeout=40) as resp:
+        with urlrequest.urlopen(req, timeout=25) as resp:
             raw = resp.read().decode("utf-8") if resp else ""
             data = json.loads(raw) if raw else {}
-            return True, None, str(data.get("idMessage") or "")
+            ok, err, mid = _green_success_or_error(data, raw)
+            if ok:
+                return True, None, mid
+            return _via_qr_text(chat_id, text, err or "GREEN API: нет idMessage")
     except urlerror.HTTPError as e:
-        return _via_qr_text(chat_id, text, f"GREEN API HTTP {e.code}")
+        chunk = e.read().decode("utf-8", errors="replace")[:400]
+        return _via_qr_text(chat_id, text, _green_http_error_detail(e.code, chunk))
     except Exception as e:
-        return _via_qr_text(chat_id, text, str(e))
+        return _via_qr_text(chat_id, text, _exc_detail(e))
 
 
 async def send_green_text_async(config: dict | None, chat_id: str, text: str) -> tuple[bool, str | None, str | None]:
@@ -77,14 +131,20 @@ async def send_green_text_async(config: dict | None, chat_id: str, text: str) ->
     url = f"{base}/waInstance{instance_id}/sendMessage/{api_token}"
     body: dict[str, Any] = {"chatId": chat_id, "message": text}
     try:
-        async with httpx.AsyncClient(timeout=40.0) as client:
+        # Короче 40с: иначе кнопка «висит», а при таймауте str(ReadTimeout) бывает пустым.
+        async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=8.0)) as client:
             r = await client.post(url, json=body)
             if r.status_code >= 400:
-                return _via_qr_text(chat_id, text, f"GREEN API HTTP {r.status_code}")
+                return _via_qr_text(chat_id, text, _green_http_error_detail(r.status_code, r.text))
             data = r.json() if r.text else {}
-            return True, None, str(data.get("idMessage") or "")
+            ok, err, mid = _green_success_or_error(data, r.text or "")
+            if ok:
+                return True, None, mid
+            return _via_qr_text(chat_id, text, err or "GREEN API: нет idMessage")
     except Exception as e:
-        return _via_qr_text(chat_id, text, str(e))
+        detail = _exc_detail(e)
+        logger.warning("sendMessage failed chat=%s detail=%s", chat_id, detail)
+        return _via_qr_text(chat_id, text, detail)
 
 
 def _location_text(latitude: float, longitude: float, name_location: str, address: str) -> str:

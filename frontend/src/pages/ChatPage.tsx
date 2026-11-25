@@ -1177,7 +1177,7 @@ export function ChatPage() {
       void qc.invalidateQueries({ queryKey: ["chat-thread", threadId] });
       void qc.invalidateQueries({ queryKey: ["chat-thread-bucket-counts"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message || "Не удалось отправить", { duration: 7000 }),
   });
 
   const clinicLocationQuery = useQuery({

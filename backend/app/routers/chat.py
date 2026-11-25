@@ -664,7 +664,7 @@ async def _send_green_file_message(
         touch_thread_on_message(thread, "out")
         await db.flush()
         detail = (err or "").strip() or "Green media недоступен; WhatsApp QR не подключён"
-        d = f"Send failed: {detail}"
+        d = f"Send failed (WhatsApp): {detail}"
         logger.warning("chat green upload failed thread=%s detail=%s", thread.id, d[:800])
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=d)
     mtype = "document"
@@ -1894,7 +1894,7 @@ async def send_message(
         db.add(msg)
         touch_thread_on_message(thread, "out")
         await db.flush()
-        d = f"Send failed ({fail_prefix}): {err}"
+        d = f"Send failed ({fail_prefix}): {(err or '').strip() or 'неизвестная ошибка WhatsApp'}"
         logger.warning("chat text failed thread=%s provider=%s detail=%s", thread_id, provider, d[:800])
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=d)
     msg = ChatMessage(
