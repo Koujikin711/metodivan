@@ -1823,9 +1823,12 @@ async def load_managers(
     company_id: int,
     pipeline_id: int,
 ) -> list[tuple[int, str]]:
-    """Активные менеджеры воронки — блоки KPI создаются автоматически."""
-    # Менеджер воронки + РОП / владелец с назначением — иначе KPI «Продажи» пустой,
-    # когда продают не только role=manager.
+    """Активные менеджеры воронки — блоки KPI создаются автоматически.
+
+    Владельца (owner) сюда не включаем: роль «владелец» + воронка иначе даёт
+    пустую карточку KPI как у менеджера (кейс Дилнозы). Продажи владельца
+    по-прежнему можно указать вручную в сделке; на доске — manager / РОП / admin.
+    """
     rows = (
         await db.execute(
             select(User.id, User.full_name, User.email, User.role)
@@ -1842,7 +1845,6 @@ async def load_managers(
                     (
                         UserRole.manager,
                         UserRole.rop,
-                        UserRole.owner,
                         UserRole.admin,
                     )
                 ),
