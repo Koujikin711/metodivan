@@ -123,19 +123,19 @@
   --mo-text-2xl: 1.5rem;
   --mo-leading: 1.5;
   --mo-leading-tight: 1.28;
-  /* Кабинет РОП: зелёный charcoal + navy-карточки + teal-акцент — единый dark для всего CRM-DN */
-  --mo-canvas: #0c1513;
-  --mo-bg: #0c1513;
-  --mo-bg-top: #121f1c;
-  --mo-surface: #15241f;
-  --mo-surface-elevated: #1c2437;
-  --mo-border: rgba(123, 143, 173, 0.24);
-  --mo-border-strong: rgba(123, 143, 173, 0.4);
+  /* CRM-DN dark (канбан): лесной charcoal + slate-карточки + teal — не MetodiOne indigo */
+  --mo-canvas: #0a0f0d;
+  --mo-bg: #0a0f0d;
+  --mo-bg-top: #0e1614;
+  --mo-surface: #121a17;
+  --mo-surface-elevated: #1e232b;
+  --mo-border: rgba(148, 163, 184, 0.22);
+  --mo-border-strong: rgba(148, 163, 184, 0.36);
   --mo-text: #f3f7fe;
-  --mo-text-muted: #8e9cb8;
-  --mo-accent: #2dd4bf;
-  --mo-accent-hover: #5eead4;
-  --mo-accent-soft: rgba(45, 212, 191, 0.16);
+  --mo-text-muted: #94a3b8;
+  --mo-accent: #14b8a6;
+  --mo-accent-hover: #2dd4bf;
+  --mo-accent-soft: rgba(20, 184, 166, 0.16);
   --mo-gold: #99f6e4;
   --mo-shadow-luxury: 0 8px 28px -12px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(45, 212, 191, 0.08);
   --mo-plum-from: #0f766e;
@@ -551,14 +551,13 @@ html {
 :root[data-theme="dark"] .shell-sidebar {
   --mo-sidebar-fg: #eef7f4;
   --mo-sidebar-fg-muted: #9bb8b0;
-  --mo-sidebar-item-hover: rgba(45, 212, 191, 0.12);
-  --mo-sidebar-item-active: rgba(45, 212, 191, 0.18);
-  --mo-sidebar-border: rgba(45, 212, 191, 0.22);
-  --mo-sidebar-shadow: inset -1px 0 0 rgba(45, 212, 191, 0.1);
+  --mo-sidebar-item-hover: rgba(20, 184, 166, 0.12);
+  --mo-sidebar-item-active: rgba(20, 184, 166, 0.18);
+  --mo-sidebar-border: rgba(20, 184, 166, 0.2);
+  --mo-sidebar-shadow: inset -1px 0 0 rgba(20, 184, 166, 0.08);
   background:
-    radial-gradient(ellipse 120% 80% at 0% 0%, rgba(45, 212, 191, 0.12), transparent 55%),
-    radial-gradient(ellipse 90% 60% at 100% 100%, rgba(15, 118, 110, 0.1), transparent 50%),
-    linear-gradient(180deg, #14221d 0%, #0f1a17 50%, #0c1513 100%);
+    radial-gradient(ellipse 120% 80% at 0% 0%, rgba(20, 184, 166, 0.1), transparent 55%),
+    linear-gradient(180deg, #0e1614 0%, #0a0f0d 55%, #080c0a 100%);
 }
 
 :root[data-theme="dark"] .shell-sidebar::before,

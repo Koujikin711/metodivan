@@ -218,30 +218,31 @@ async def restore_protected_from_equal_moves(
         for lid, mid in rows:
             cur[int(lid)] = int(mid) if mid is not None else None
 
+    # Кандидаты: ушли с исходного менеджера после equal-раздачи (даже если потом ещё раз двигали).
     candidates = [
         lid
-        for lid, (from_mid, to_mid) in first_move.items()
-        if cur.get(lid) == to_mid and from_mid is not None and from_mid != to_mid
+        for lid, (from_mid, _to_mid) in first_move.items()
+        if from_mid is not None and cur.get(lid) is not None and cur.get(lid) != from_mid
     ]
     if not candidates:
         return 0, []
 
     protected = await protected_lead_ids(db, company_id=company_id, lead_ids=candidates)
-    # Также: если from_mid не в target_ids — всё равно вернём защищённых
     restored: list[tuple[int, int | None, int]] = []
     for lid in candidates:
         if lid not in protected:
             continue
-        from_mid, to_mid = first_move[lid]
+        from_mid, _to_mid = first_move[lid]
         if from_mid is None:
             continue
         lead = await db.get(Lead, lid)
         if lead is None or lead.company_id != company_id:
             continue
-        if lead.manager_id != to_mid:
+        cur_mid = int(lead.manager_id) if lead.manager_id is not None else None
+        if cur_mid == from_mid:
             continue
         lead.manager_id = from_mid
-        restored.append((lid, from_mid, to_mid))
+        restored.append((lid, from_mid, cur_mid or 0))
 
     return len(restored), restored
 
@@ -253,12 +254,30 @@ async def selectable_silent_leads(
     target_ids: list[int],
     include_unassigned: bool,
 ) -> list[tuple[int, int | None]]:
-    """Лиды для равной раздачи: без исходящих и без продаж/закрытых стадий."""
+    """Лиды для равной раздачи: «Новый лид» / без исходящих, без продаж и закрытых стадий."""
+    new_stage_ids = (
+        await db.execute(
+            select(PipelineStage.id)
+            .outerjoin(Pipeline, Pipeline.id == PipelineStage.pipeline_id)
+            .where(
+                PipelineStage.name == "Новый лид",
+                or_(
+                    PipelineStage.company_id == company_id,
+                    Pipeline.company_id == company_id,
+                ),
+            ),
+        )
+    ).scalars().all()
+    new_ids = {int(x) for x in new_stage_ids}
+
     filters = [Lead.company_id == company_id]
     if include_unassigned:
         filters.append(or_(Lead.manager_id.in_(target_ids), Lead.manager_id.is_(None)))
     else:
         filters.append(Lead.manager_id.in_(target_ids))
+    # Предпочитаем колонку «Новый лид»; иначе — все, но всё равно отфильтруем protected.
+    if new_ids:
+        filters.append(Lead.status_id.in_(new_ids))
 
     rows = (
         await db.execute(

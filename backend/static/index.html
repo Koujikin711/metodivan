@@ -24,14 +24,14 @@
     />
     <script>
       (function () {
-        /* CRM-DN: светлая teal по умолчанию (v2 сбрасывает залипший dark). */
-        if (!localStorage.getItem("mo-theme-crmdn-teal-v2")) {
-          localStorage.setItem("mo-theme", "light");
-          localStorage.setItem("mo-theme-crmdn-teal-v2", "1");
+        /* CRM-DN: тёмный стиль канбана по умолчанию (не светлый MetodiOne). */
+        if (!localStorage.getItem("mo-theme-crmdn-dark-v3")) {
+          localStorage.setItem("mo-theme", "dark");
+          localStorage.setItem("mo-theme-crmdn-dark-v3", "1");
         }
         var t = localStorage.getItem("mo-theme");
-        if (t === "dark") document.documentElement.dataset.theme = "dark";
-        else document.documentElement.dataset.theme = "light";
+        if (t === "light") document.documentElement.dataset.theme = "light";
+        else document.documentElement.dataset.theme = "dark";
         /* Если бандл не поднялся (деплой Amvera) — тихо перезагрузить, не сидеть на пустом экране. */
         setTimeout(function () {
           var root = document.getElementById("root");
@@ -51,8 +51,8 @@
         }, 8000);
       })();
     </script>
-    <script type="module" crossorigin src="/assets/index-BCGEsF6R.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-UoVUsB1y.css">
+    <script type="module" crossorigin src="/assets/index-BrPEoVLu.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BecODxxF.css">
   </head>
   <body>
     <div id="root"></div>
