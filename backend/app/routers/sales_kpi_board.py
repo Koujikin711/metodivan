@@ -3857,6 +3857,8 @@ async def company_report(
                 specialist_ids=sids,
                 direction_ids=chosen_services,
             )
+            for mid, _ in managers:
+                fact += manual_facts.get((mid, int(item.id)), 0)
         elif item.source_type == "direction":
             if sids:
                 unit_price = unit_prices.get(_norm_kpi_label(item.name))
@@ -3868,6 +3870,8 @@ async def company_report(
             elif item.direction_id is not None:
                 for mid, _ in managers:
                     fact += direction_facts.get((mid, int(item.direction_id)), 0)
+            for mid, _ in managers:
+                fact += manual_facts.get((mid, int(item.id)), 0)
         else:
             for mid, _ in managers:
                 fact += manual_facts.get((mid, int(item.id)), 0)

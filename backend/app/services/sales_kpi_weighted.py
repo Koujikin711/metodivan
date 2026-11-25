@@ -1130,14 +1130,9 @@ def _matched_brought(
     explicit = [int(d) for d in direction_ids]
     specs = {int(s) for s in specialist_ids}
     price = Decimal(str(unit_price or 0))
-    # Запись «Курс / Курс 15 / Протокол» на кабинете врача лежит в manual по имени услуги.
-    from app.services.booking_directions import is_course_like_direction_name
-
-    total = (
-        manual.get((manager_id, _norm_kpi_label(name)), Decimal("0"))
-        if is_course_like_direction_name(name)
-        else Decimal("0")
-    )
+    # Direction-строка плана: плюс ручные продажи с тем же именем
+    # (CRM-DN: Интенсив/Консультация в «Пакетах», не только онлайн-запись / курс).
+    total = manual.get((manager_id, _norm_kpi_label(name)), Decimal("0"))
     for key, amount in detail.items():
         mid, sid, did, service_amount = _detail_row(key)
         if mid != manager_id:
@@ -2435,6 +2430,7 @@ def build_manager_lines(
                 specialist_ids=specialist_ids,
                 direction_ids=chosen_services,
             )
+            fact += manual_facts.get((manager_id, int(item.id)), 0)
         elif item.source_type == "direction":
             if specialist_ids:
                 unit_price = prices.get(_norm_kpi_label(item.name))
@@ -2448,6 +2444,8 @@ def build_manager_lines(
                 fact = direction_facts.get((manager_id, int(item.direction_id)), 0)
             else:
                 fact = 0
+            # CRM-DN: пакетные продажи Интенсив/Консультация — в факте KPI.
+            fact += manual_facts.get((manager_id, int(item.id)), 0)
         else:
             fact = manual_facts.get((manager_id, int(item.id)), 0)
         # Полные оплаты из окна «Продажи» (sales) — в факт показателя по имени.
