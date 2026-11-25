@@ -1687,8 +1687,8 @@ async def send_message_location(
     current_user: CurrentUser,
     company_id: CurrentCompanyId,
 ) -> ChatMessageRead:
-    """Отправить фиксированную локацию клиники в WhatsApp (пин на карте)."""
-    thread, cfg, dest = await _resolve_green_send(db, thread_id, company_id, current_user)
+    """Отправить локацию в WhatsApp (пин или ссылка на карты)."""
+    thread, cfg, dest, provider = await _resolve_outbound_send(db, thread_id, company_id, current_user)
     loc = clinic_whatsapp_location()
     name = str(loc["name_location"])
     addr = str(loc["address"])
@@ -1699,6 +1699,12 @@ async def send_message_location(
         preview = f"{preview}\n{addr}"
     preview = f"{preview}\nhttps://maps.google.com/?q={lat},{lng}"
 
+    if provider != IntegrationProvider.green_api.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Локацию можно отправить только в WhatsApp-диалог (не Instagram).",
+        )
+
     ok, err, provider_msg_id = await send_green_location(
         cfg,
         dest,
@@ -1708,9 +1714,14 @@ async def send_message_location(
         address=addr,
     )
     if not ok:
+        detail = (err or "").strip() or "WhatsApp не ответил"
+        if "интеграц" in detail.lower() or "instance" in detail.lower() or "token" in detail.lower():
+            detail = f"{detail}. Проверьте GREEN API в Интеграциях."
+        elif "chat id" in detail.lower() or "телефон" in detail.lower():
+            detail = f"{detail}. У лида должен быть номер WhatsApp."
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Не удалось отправить локацию: {err or 'ошибка WhatsApp'}",
+            detail=f"Не удалось отправить локацию: {detail}",
         )
     msg = ChatMessage(
         company_id=thread.company_id,
@@ -1726,6 +1737,7 @@ async def send_message_location(
     db.add(msg)
     touch_thread_on_message(thread, "out")
     await db.flush()
+    await db.commit()
     return _msg_read(msg)
 
 

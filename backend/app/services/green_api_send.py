@@ -87,6 +87,14 @@ async def send_green_text_async(config: dict | None, chat_id: str, text: str) ->
         return _via_qr_text(chat_id, text, str(e))
 
 
+def _location_text(latitude: float, longitude: float, name_location: str, address: str) -> str:
+    label = (name_location or address or "Локация").strip() or "Локация"
+    maps = f"https://maps.google.com/?q={latitude},{longitude}"
+    if address.strip() and address.strip() not in label:
+        return f"📍 {label}\n{address.strip()}\n{maps}"
+    return f"📍 {label}\n{maps}"
+
+
 async def send_green_location(
     config: dict | None,
     chat_id: str,
@@ -96,15 +104,14 @@ async def send_green_location(
     name_location: str = "",
     address: str = "",
 ) -> tuple[bool, str | None, str | None]:
-    """WhatsApp-пин через Green API sendLocation."""
+    """WhatsApp-пин через Green API sendLocation; при сбое — ссылка на карты текстом."""
     cfg = config or {}
+    text = _location_text(latitude, longitude, name_location, address)
     instance_id = cfg.get("instance_id") or cfg.get("instanceId")
     api_token = cfg.get("api_token") or cfg.get("apiToken") or cfg.get("apiTokenInstance")
     if not instance_id or not api_token:
-        # QR-мост локацию не шлёт — уходит ссылка на карты текстом.
-        label = (name_location or address or "Локация").strip() or "Локация"
-        maps = f"https://maps.google.com/?q={latitude},{longitude}"
-        return await send_green_text_async(cfg, chat_id, f"📍 {label}\n{maps}")
+        # QR-мост локацию-пин не шлёт — только текст со ссылкой.
+        return await send_green_text_async(cfg, chat_id, text)
     base = green_api_base_from_config(cfg)
     url = f"{base}/waInstance{instance_id}/sendLocation/{api_token}"
     body: dict[str, Any] = {
@@ -116,24 +123,22 @@ async def send_green_location(
         body["nameLocation"] = name_location.strip()[:200]
     if address.strip():
         body["address"] = address.strip()[:500]
+    # Короткий таймаут: иначе кнопка «висит» 40с и кажется мёртвой.
     try:
-        async with httpx.AsyncClient(timeout=40.0) as client:
+        async with httpx.AsyncClient(timeout=12.0) as client:
             r = await client.post(url, json=body)
-            if r.status_code >= 400:
-                label = (name_location or address or "Локация").strip() or "Локация"
-                maps = f"https://maps.google.com/?q={latitude},{longitude}"
-                return await send_green_text_async(
-                    cfg,
-                    chat_id,
-                    f"📍 {label}\n{maps}",
-                )
-            data = r.json() if r.text else {}
-            return True, None, str(data.get("idMessage") or "")
-    except Exception:
-        label = (name_location or address or "Локация").strip() or "Локация"
-        maps = f"https://maps.google.com/?q={latitude},{longitude}"
-        return await send_green_text_async(cfg, chat_id, f"📍 {label}\n{maps}")
-
+            if r.status_code < 400:
+                data = r.json() if r.text else {}
+                return True, None, str(data.get("idMessage") or "")
+            logger.warning(
+                "sendLocation HTTP %s → fallback text chat=%s body=%s",
+                r.status_code,
+                chat_id,
+                (r.text or "")[:240],
+            )
+    except Exception as e:
+        logger.warning("sendLocation failed → fallback text chat=%s err=%s", chat_id, e)
+    return await send_green_text_async(cfg, chat_id, text)
 
 def _upload_mime(filename: str, mime: str | None) -> str | None:
     low = (filename or "").lower()

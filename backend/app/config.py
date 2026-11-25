@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     # Единая локация клиники для WhatsApp (все менеджеры шлют одно и то же; не GPS телефона).
     # Источник: https://maps.google.com/?q=38.546066,68.754959 (ул. Дилкушо, Душанбе).
-    clinic_wa_location_name: str = "Metodi Clinic"
+    clinic_wa_location_name: str = "Маркетинг"
     clinic_wa_location_address: str = "ул. Дилкушо, Душанбе"
     clinic_wa_location_lat: float = 38.546066
     clinic_wa_location_lng: float = 68.754959

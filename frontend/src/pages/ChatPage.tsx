@@ -1225,17 +1225,19 @@ export function ChatPage() {
       await apiFetch<ChatMessage>(`/api/chat/threads/${threadId}/messages/location`, {
         method: "POST",
         body: JSON.stringify({}),
+        timeoutMs: 45_000,
       });
       setLocOpen(false);
+      setLocError("");
       void qc.invalidateQueries({ queryKey: ["chat-messages", threadId] });
       void qc.invalidateQueries({ queryKey: ["chat-threads"] });
       void qc.invalidateQueries({ queryKey: ["chat-thread", threadId] });
       void qc.invalidateQueries({ queryKey: ["chat-thread-bucket-counts"] });
-      toast.success("Локация клиники отправлена");
+      toast.success("Локация отправлена в WhatsApp");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Не удалось отправить локацию";
       setLocError(msg);
-      toast.error(msg);
+      toast.error(msg, { duration: 6000 });
     } finally {
       setLocBusy(false);
     }
@@ -2056,7 +2058,7 @@ export function ChatPage() {
                 {locOpen ? (
                   <div className="mb-2 rounded-xl border border-[var(--mo-border)] bg-[var(--mo-surface)] p-3">
                     <div className="mb-2 flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium text-[var(--mo-text)]">Локация клиники</p>
+                      <p className="text-sm font-medium text-[var(--mo-text)]">Локация</p>
                       <button
                         type="button"
                         className="text-xs mo-muted hover:text-[var(--mo-text)]"
@@ -2079,11 +2081,14 @@ export function ChatPage() {
                       </div>
                     ) : (
                       <p className="mt-2 text-sm text-[var(--mo-text)]">
-                        📍 Metodi Clinic
+                        📍 Маркетинг
                         <span className="mt-0.5 block mo-muted">ул. Дилкушо, Душанбе</span>
                       </p>
                     )}
                     {locError ? <p className="mt-2 text-xs text-rose-400">{locError}</p> : null}
+                    {threadId == null ? (
+                      <p className="mt-2 text-xs text-amber-400">Откройте диалог WhatsApp, затем отправьте локацию.</p>
+                    ) : null}
                     <div className="mt-3">
                       <button
                         type="button"
