@@ -1303,8 +1303,8 @@ class LeadRedistributeEqualBody(BaseModel):
         description="Не трогать Удачно/Отказ и лиды с KPI-продажей",
     )
     restore_protected: bool = Field(
-        default=True,
-        description="Сначала вернуть ошибочно ушедшие «проданные/общались» на прежнего менеджера",
+        default=False,
+        description="Вернуть «проданные/общались» на менеджера до equal-раздачи (осторожно при нескольких раздачах)",
     )
 
 
