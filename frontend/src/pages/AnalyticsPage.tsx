@@ -145,7 +145,7 @@ export function AnalyticsPage() {
 
   useEffect(() => {
     if (!servicesMode) return;
-    // Для услуг удобнее сразу «за месяц» — живые данные клиники.
+    // Для услуг удобнее сразу «за месяц» — живые данные.
     setPeriod((p) => (p === "day" ? "month" : p));
   }, [servicesMode]);
 
