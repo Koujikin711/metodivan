@@ -840,11 +840,11 @@ export function ExpensesPage() {
         body: JSON.stringify({
           txn_date: txnDate,
           expense: Number(expense),
-          bank: bank || null,
-          article: article || null,
-          brief_category: brief || "Расход",
-          detail_category: detail || null,
-          product_service: product || null,
+          bank: resolveCatalogValue(bank),
+          article: resolveCatalogValue(article),
+          brief_category: resolveCatalogValue(brief) || "Расход",
+          detail_category: resolveCatalogValue(detail),
+          product_service: resolveCatalogValue(product),
           basis: basis || null,
           counterparty: counterparty || null,
           employee_user_id: fot && employeeId ? Number(employeeId) : null,
@@ -915,11 +915,21 @@ export function ExpensesPage() {
     setEditDraft(draftFromRow(row));
   };
 
+  function resolveCatalogValue(raw: string): string | null {
+    const v = raw.trim();
+    if (!v || v === "__custom__") return null;
+    return v;
+  }
+
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     const amount = Number(expense);
     if (!Number.isFinite(amount) || amount <= 0) {
       toast.error("Укажите сумму расхода");
+      return;
+    }
+    if (detail === "__custom__" || product === "__custom__" || bank === "__custom__" || article === "__custom__") {
+      toast.error("Выберите «Другое…» и введите своё значение в поле ниже");
       return;
     }
     createMutation.mutate();
@@ -931,17 +941,23 @@ export function ExpensesPage() {
     onChange: (v: string) => void,
     label: string,
   ) {
-    const known = options.includes(value);
+    const inList = Boolean(value) && options.includes(value);
+    /** Пусто = «—»; «__custom__» или любой текст вне списка = своё. */
+    const selectValue = inList ? value : value === "" ? "" : "__custom__";
+    const customMode = selectValue === "__custom__";
+    const customText = value === "__custom__" ? "" : value;
     return (
-      <label className="expenses-field">
+      <div className="expenses-field">
         <span className="expenses-field__label">{label}</span>
         <select
           className="mo-input expenses-field__control"
-          value={known ? value : "__custom__"}
+          value={selectValue}
           onChange={(ev) => {
-            if (ev.target.value === "__custom__") onChange("");
-            else onChange(ev.target.value);
+            const next = ev.target.value;
+            if (next === "__custom__") onChange("__custom__");
+            else onChange(next);
           }}
+          aria-label={label}
         >
           <option value="">—</option>
           {options.map((o) => (
@@ -951,15 +967,20 @@ export function ExpensesPage() {
           ))}
           <option value="__custom__">Другое…</option>
         </select>
-        {!known ? (
+        {customMode ? (
           <input
             className="mo-input expenses-field__control expenses-field__custom"
-            value={value}
-            onChange={(ev) => onChange(ev.target.value)}
-            placeholder="Своё значение"
+            value={customText}
+            onChange={(ev) => {
+              const text = ev.target.value.trimStart();
+              onChange(text.length === 0 ? "__custom__" : text);
+            }}
+            placeholder="Введите своё значение"
+            aria-label={`${label}: своё значение`}
+            autoFocus={value === "__custom__"}
           />
         ) : null}
-      </label>
+      </div>
     );
   }
 

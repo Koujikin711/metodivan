@@ -277,7 +277,7 @@ export function AnalyticsPage() {
     (servicesQuery.data?.service_stats ?? []).length === 0 &&
     Number(servicesQuery.data?.revenue_total ?? 0) === 0;
 
-  // CRM-DN: без демо-снимка клиники — только живые данные / пустое использование.
+  // CRM-DN: только живые данные / пустое использование.
   const serviceRowsRaw = servicesQuery.data?.service_stats ?? [];
   const serviceRows = useMemo(
     () =>

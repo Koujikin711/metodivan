@@ -5201,7 +5201,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .expenses-field__custom {
-  margin-top: 0.1rem;
+  margin-top: 0.35rem;
+  border-color: color-mix(in srgb, var(--mo-accent) 45%, var(--mo-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--mo-accent) 18%, transparent);
 }
 
 .expenses-field--span {

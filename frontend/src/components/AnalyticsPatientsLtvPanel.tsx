@@ -72,10 +72,10 @@ export function AnalyticsPatientsLtvPanel() {
     <div className="space-y-4">
       <div className="ltv-toolbar mo-section">
         <div>
-          <h2 className="text-base font-semibold">LTV пациентов</h2>
+          <h2 className="text-base font-semibold">LTV клиентов</h2>
           <p className="mt-1 max-w-xl text-sm mo-muted">
-            Новые пациенты выбранного месяца: сколько их, сколько они уже заплатили и кто вернулся
-            ещё раз. По умолчанию — прошлый полный месяц.
+            Новые клиенты выбранного месяца: сколько их, сколько они уже заплатили и кто вернулся ещё
+            раз. По умолчанию — прошлый полный месяц.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
@@ -107,8 +107,8 @@ export function AnalyticsPatientsLtvPanel() {
         <>
           <div className="ltv-kpis">
             {[
-              ["Пациентов", String(data.patients), "Первая покупка в этом месяце"],
-              ["Уже оплатили", money(data.avg_paid_ltv), "Касса на пациента, без долга"],
+              ["Клиентов", String(data.patients), "Первая покупка в этом месяце"],
+              ["Уже оплатили", money(data.avg_paid_ltv), "Касса на клиента, без долга"],
               ["Вернулись", pct(data.repeat_purchase_rate), "Купили ещё хотя бы раз"],
             ].map(([label, value, hint]) => (
               <div key={label} className="ltv-kpi">
@@ -122,7 +122,7 @@ export function AnalyticsPatientsLtvPanel() {
           <div className="mo-section p-4">
             <h3 className="mb-1 text-base font-semibold">Как копится касса</h3>
             <p className="mb-3 max-w-2xl text-sm mo-muted">
-              Средняя оплата на пациента с первого дня. 90 дней включают 30, год включает всё
+              Средняя оплата на клиента с первого дня. 90 дней включают 30, год включает всё
               предыдущее. Это не отдельный месяц, а накопленная касса.
             </p>
             <div className="ltv-windows">
