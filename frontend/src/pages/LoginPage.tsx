@@ -149,8 +149,7 @@ export function LoginPage() {
           </p>
           {mode === "login" ? (
             <p className="mt-2 max-w-sm text-[11px] leading-relaxed text-[var(--mo-text-muted)]">
-              Клиника: <span className="font-medium">admin</span> / пароль клиники. Продажи:{" "}
-              <span className="font-medium">admin</span> / D711711 — только продажи и KPI, без онлайн-записи.
+              Вход сотрудников CRM-DN: email и пароль из WhatsApp или письма.
             </p>
           ) : null}
         </div>

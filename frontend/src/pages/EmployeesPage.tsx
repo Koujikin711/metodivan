@@ -276,6 +276,7 @@ export function EmployeesPage() {
     detail: string;
     inviteUrl?: string;
   } | null>(null);
+  const crmDnLoginUrl = "https://crm-dn-koujikin.mia0.amvera.tech/login";
   const [inviteResult, setInviteResult] = useState<InviteResult | null>(null);
 
   const pipelines = pipelinesQuery.data ?? [];
@@ -660,12 +661,14 @@ export function EmployeesPage() {
         whatsapp_sent: boolean;
         detail: string;
         password: string;
+        invite_url?: string | null;
       }>(`/api/employees/${employeeId}/resend-credentials`, { method: "POST" }),
     onSuccess: (r) => {
       setIssuedLogin({
         email: editEmail.trim(),
         password: r.password,
         detail: r.detail || "Пароль записан",
+        inviteUrl: r.invite_url || crmDnLoginUrl,
       });
       toast.success(r.detail || "Пароль записан");
     },
@@ -1329,8 +1332,19 @@ export function EmployeesPage() {
                     <p className="mt-1 break-all">
                       Пароль: <span className="font-semibold tracking-wide">{issuedLogin.password}</span>
                     </p>
-                    <p className="mt-2 text-[11px] leading-relaxed mo-muted">
-                      Этот пароль уже в системе. Введите его на телефоне как на экране, без пробела в конце.
+                    <p className="mt-2 break-all text-[11px] leading-relaxed">
+                      Вход только здесь:{" "}
+                      <a
+                        className="font-medium text-[var(--mo-accent)] underline"
+                        href={issuedLogin.inviteUrl || crmDnLoginUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {issuedLogin.inviteUrl || crmDnLoginUrl}
+                      </a>
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed mo-muted">
+                      Не MetodiOne — там другой сайт и пароль не подойдёт.
                     </p>
                   </div>
                 ) : null}

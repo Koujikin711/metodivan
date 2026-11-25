@@ -9,7 +9,6 @@ import { GradientIconBox } from "@/components/GradientIconBox";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import metodiMarkUrl from "@/assets/metodione-mark.svg?url";
 import { getStoredToken, setStoredToken } from "@/lib/api";
 import { decodeRoleFromToken, decodeUserIdFromToken } from "@/lib/auth";
 import { useTariffNavAccess } from "@/hooks/useTariffNavAccess";
@@ -25,10 +24,10 @@ import {
   sameReturnPlace,
 } from "@/lib/leadReturn";
 
-function MetodiBrandMark({ className = "" }: { className?: string }) {
+function CrmDnBrandMark({ className = "" }: { className?: string }) {
   return (
     <img
-      src={metodiMarkUrl}
+      src="/pwa-icon.svg"
       alt=""
       className={["shell-sidebar-brand-mark", className].filter(Boolean).join(" ")}
       decoding="async"
@@ -197,7 +196,7 @@ export function MainLayout() {
               className="shell-sidebar-brand"
               aria-label={phoneLayout ? "CRM-DN" : menuExpanded ? "Свернуть меню" : "Развернуть меню"}
             >
-              <MetodiBrandMark />
+              <CrmDnBrandMark />
               <span className="shell-sidebar-brand-text">CRM-DN</span>
             </button>
           </div>

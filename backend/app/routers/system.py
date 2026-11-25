@@ -119,13 +119,20 @@ async def smtp_config(
     if current_user.role != UserRole.owner:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Только владелец")
     creds, source = await _resolve_smtp(db, company_id)
+    # Не показывать дефолт metoditj@… когда почта реально не настроена — путает.
+    from_email = str(creds.get("smtp_from") or "").strip()
+    if source == "none":
+        from_email = ""
+    elif not from_email:
+        from_email = (settings.smtp_from or "").strip()
     return SmtpConfigRead(
         host=str(creds.get("smtp_host") or ""),
         port=int(creds.get("smtp_port") or 587),
         user=str(creds.get("smtp_user") or ""),
-        from_email=str(creds.get("smtp_from") or settings.smtp_from or ""),
+        from_email=from_email,
         has_password=bool(str(creds.get("smtp_password") or "").strip()),
-        public_app_url=settings.public_app_url,
+        public_app_url=(settings.public_app_url or "").strip()
+        or "https://crm-dn-koujikin.mia0.amvera.tech",
         public_api_base_url=settings.public_api_base_url,
         source=source,
     )

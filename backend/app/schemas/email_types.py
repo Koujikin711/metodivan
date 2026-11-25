@@ -5,13 +5,18 @@ from pydantic import PlainValidator
 
 def _normalize_email(v: str) -> str:
     s = v.strip().lower()
+    # Частая опечатка в поле: name.@mail.ru → name@mail.ru
+    s = s.replace(".@", "@")
     if "@" not in s or s.count("@") != 1:
         raise ValueError("Неверный формат email")
     local, domain = s.split("@", 1)
+    local = local.strip(".").strip()
+    domain = domain.strip(".").strip()
     if not local or not domain:
         raise ValueError("Неверный формат email")
     if "." not in domain:
         raise ValueError("Неверный формат email")
+    s = f"{local}@{domain}"
     if len(s) > 320:
         raise ValueError("Email слишком длинный")
     return s

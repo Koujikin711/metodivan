@@ -149,6 +149,7 @@ class ResendCredentialsResult(BaseModel):
     whatsapp_sent: bool
     detail: str
     password: str
+    invite_url: str | None = None
 
 
 def _rand_password() -> str:
@@ -916,8 +917,10 @@ async def invite_employee(
         if wa_err:
             detail += f" WhatsApp не ушёл: {wa_err}"
     elif wa_sent:
-        detail = f"Сотрудник создан. WhatsApp отправлен. Письмо на {email} не ушло"
-        detail += f" ({mail_hint or 'проверьте SMTP'})."
+        detail = (
+            f"Сотрудник создан. WhatsApp отправлен. "
+            f"Email: настройте SMTP (Gmail/Mail.ru) в Сотрудники → SMTP."
+        )
     else:
         detail = "Сотрудник создан. Email и WhatsApp не ушли — скопируйте ссылку и пароль с экрана."
         if mail_hint:
@@ -1501,7 +1504,8 @@ async def resend_employee_credentials(
         if email_sent and not wa_sent and wa_err:
             detail += f" WhatsApp: {wa_err}"
         elif wa_sent and not email_sent:
-            detail += f" Письмо не ушло{f': {email_err}' if email_err else ''}."
+            # WA уже доставил доступ — SMTP подсказка коротко, без «аварии»
+            detail += " Email: настройте SMTP (Gmail/Mail.ru) ниже на этой странице."
     else:
         detail = "Пароль записан. Письмо и WhatsApp не ушли — скопируйте пароль с этого экрана."
         if email_err:
@@ -1515,6 +1519,7 @@ async def resend_employee_credentials(
         whatsapp_sent=wa_sent,
         detail=detail,
         password=temp_password,
+        invite_url=invite_url,
     )
 
 

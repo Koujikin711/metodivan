@@ -4,8 +4,6 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import toast from "react-hot-toast";
 
-import metodiMarkUrl from "@/assets/metodione-mark.svg?url";
-
 import App from "./App";
 import "./index.css";
 import "leaflet/dist/leaflet.css";
@@ -28,7 +26,9 @@ toast.error = ((message: Parameters<typeof toast.error>[0], opts?: Parameters<ty
   return rawToastError(message, opts);
 }) as typeof toast.error;
 
-function applyMetodiFavicons() {
+/** CRM-DN: не подменять favicon логотипом MetodiOne из общего репо. */
+function applyCrmDnFavicons() {
+  const href = "/pwa-icon.svg";
   for (const rel of ["icon", "apple-touch-icon"] as const) {
     let el = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
     if (!el) {
@@ -37,10 +37,10 @@ function applyMetodiFavicons() {
       document.head.appendChild(el);
     }
     el.type = "image/svg+xml";
-    el.href = metodiMarkUrl;
+    el.href = href;
   }
 }
-applyMetodiFavicons();
+applyCrmDnFavicons();
 
 const queryClient = new QueryClient({
   defaultOptions: {
