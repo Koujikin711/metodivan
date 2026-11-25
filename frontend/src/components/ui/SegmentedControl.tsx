@@ -26,8 +26,8 @@ export function SegmentedControl<T extends string>({ segments, value, onChange }
             className={[
               "flex min-h-[68px] flex-col items-center justify-center rounded-xl border px-1 py-2 text-center transition",
               active
-                ? "border-[#d4af37] bg-white text-[var(--mo-text)] shadow-[var(--mo-shadow-luxury)] ring-1 ring-[#d4af37]/30"
-                : "border-[var(--mo-border)] bg-[var(--mo-surface-elevated)] mo-muted hover:border-[#d4af37]/50 hover:text-[var(--mo-text)]",
+                ? "border-[var(--mo-accent)] bg-white text-[var(--mo-text)] shadow-[var(--mo-shadow-luxury)] ring-1 ring-[var(--mo-accent)]/30"
+                : "border-[var(--mo-border)] bg-[var(--mo-surface-elevated)] mo-muted hover:border-[var(--mo-accent)]/50 hover:text-[var(--mo-text)]",
             ].join(" ")}
           >
             <span className="text-[10px] font-semibold uppercase tracking-wide">{seg.label}</span>

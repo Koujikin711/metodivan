@@ -1850,7 +1850,7 @@ export function OnlineBookingPage() {
               {canEditBooking ? (
                 <section
                   ref={formPanelRef}
-                  className="mo-section overflow-visible p-4 ring-1 ring-[#d4af37]/20"
+                  className="mo-section overflow-visible p-4 ring-1 ring-[var(--mo-accent)]/20"
                 >
                   <div className="booking-form-calendar mb-3">
                     <MiniMonthCalendar compact value={filterDate} onChange={setFilterDate} />

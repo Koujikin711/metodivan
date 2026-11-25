@@ -68,9 +68,9 @@
   --mo-sidebar-border: #c9ddd7;
   --mo-sidebar-shadow: none;
   --booking-grid-hatch: rgba(148, 163, 184, 0.18);
-  --booking-appt-booked-bg: #dbeafe;
-  --booking-appt-booked-border: #2563eb;
-  --booking-appt-booked-text: #1e3a8a;
+  --booking-appt-booked-bg: #ccfbf1;
+  --booking-appt-booked-border: #0f766e;
+  --booking-appt-booked-text: #115e59;
   --booking-appt-completed-bg: #d1fae5;
   --booking-appt-completed-border: #059669;
   --booking-appt-completed-text: #064e3b;
@@ -153,9 +153,9 @@
   --mo-sidebar-border: rgba(45, 212, 191, 0.24);
   --mo-sidebar-shadow: none;
   --booking-grid-hatch: rgba(255, 255, 255, 0.06);
-  --booking-appt-booked-bg: #1e3a5f;
-  --booking-appt-booked-border: #60a5fa;
-  --booking-appt-booked-text: #e0f2fe;
+  --booking-appt-booked-bg: #134e4a;
+  --booking-appt-booked-border: #2dd4bf;
+  --booking-appt-booked-text: #ccfbf1;
   --booking-appt-completed-bg: #064e3b;
   --booking-appt-completed-border: #34d399;
   --booking-appt-completed-text: #d1fae5;
@@ -2447,8 +2447,8 @@ nav[aria-label="Основная навигация"] .shell-nav-link.is-active 
 }
 
 .booking-patient-find__badge.is-booked {
-  background: color-mix(in srgb, #60a5fa 20%, transparent);
-  color: #93c5fd;
+  background: color-mix(in srgb, #14b8a6 20%, transparent);
+  color: #99f6e4;
 }
 
 .booking-patient-find__badge.is-cancelled {
@@ -2465,7 +2465,7 @@ nav[aria-label="Основная навигация"] .shell-nav-link.is-active 
 }
 
 .booking-patient-find__visit.is-booked {
-  box-shadow: inset 3px 0 0 #60a5fa;
+  box-shadow: inset 3px 0 0 var(--mo-accent);
 }
 
 .booking-patient-find__visit.is-cancelled {
@@ -2529,28 +2529,32 @@ nav[aria-label="Основная навигация"] .shell-nav-link.is-active 
 
 :root[data-theme="dark"] .booking-admin-bar {
   background:
-    linear-gradient(145deg, #1c2940 0%, #152033 100%);
-  border-color: rgba(186, 198, 220, 0.22);
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--mo-surface-elevated) 92%, #0c1a18) 0%,
+      var(--mo-surface) 100%
+    );
+  border-color: var(--mo-border);
 }
 
 :root[data-theme="dark"] .booking-schedule-search__input {
-  background: #121a2b !important;
-  border-color: rgba(148, 175, 220, 0.28) !important;
+  background: var(--mo-surface) !important;
+  border-color: var(--mo-border-strong) !important;
 }
 
 :root[data-theme="dark"] .booking-patient-find {
-  background: #1a263c;
-  border-color: rgba(186, 198, 220, 0.24);
+  background: var(--mo-surface-elevated);
+  border-color: var(--mo-border);
 }
 
 :root[data-theme="dark"] .booking-patient-find__card {
-  background: #152033;
-  border-color: rgba(186, 198, 220, 0.2);
-  border-left-color: #60a5fa;
+  background: var(--mo-surface);
+  border-color: var(--mo-border);
+  border-left-color: var(--mo-accent);
 }
 
 :root[data-theme="dark"] .booking-patient-find__toggle:hover {
-  background: rgba(96, 165, 250, 0.08);
+  background: var(--mo-accent-soft);
 }
 
 :root:not([data-theme="dark"]) .booking-patient-find__badge.is-completed {
@@ -2564,8 +2568,8 @@ nav[aria-label="Основная навигация"] .shell-nav-link.is-active 
 }
 
 :root:not([data-theme="dark"]) .booking-patient-find__badge.is-booked {
-  background: color-mix(in srgb, #2563eb 12%, white);
-  color: #1e40af;
+  background: color-mix(in srgb, #0f766e 12%, white);
+  color: #115e59;
 }
 
 :root:not([data-theme="dark"]) .booking-patient-find__stat.is-ok {
@@ -3429,7 +3433,7 @@ html.booking-appt-moving .booking-week-grid__half-free.is-drop-target {
 }
 
 .booking-filter-resource--checked {
-  background: color-mix(in srgb, var(--mo-accent-soft) 85%, #dbeafe);
+  background: var(--mo-accent-soft);
 }
 
 .booking-filter-resource-icon {
@@ -3518,8 +3522,8 @@ html.booking-appt-moving .booking-week-grid__half-free.is-drop-target {
 }
 
 :root[data-theme="dark"] .booking-page-date-nav {
-  background: rgba(15, 23, 42, 0.55);
-  border-color: rgba(148, 163, 184, 0.2);
+  background: color-mix(in srgb, var(--mo-surface-elevated) 88%, #0c1a18);
+  border-color: var(--mo-border);
 }
 
 :root[data-theme="dark"] .booking-legend-item--booked {
@@ -3738,8 +3742,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   opacity: 0.8;
 }
 .mo-input:focus {
-  border-color: var(--mo-gold);
-  box-shadow: inset 0 2px 6px rgba(44, 37, 32, 0.04), 0 0 0 2px rgba(212, 175, 55, 0.2);
+  border-color: var(--mo-accent);
+  box-shadow: inset 0 2px 6px rgba(15, 55, 48, 0.04), 0 0 0 2px color-mix(in srgb, var(--mo-accent) 28%, transparent);
 }
 :root[data-theme="dark"] .mo-input {
   background-color: #1b342f;
@@ -3805,7 +3809,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .executive-banner {
   @apply relative overflow-hidden rounded-xl px-4 py-2.5 text-center text-sm font-semibold text-white;
   background-color: var(--mo-plum-from);
-  border: 1px solid rgba(212, 175, 55, 0.55);
+  border: 1px solid color-mix(in srgb, var(--mo-accent) 55%, transparent);
   box-shadow: var(--mo-shadow-luxury);
 }
 .executive-banner::before {
@@ -4285,7 +4289,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   color: var(--mo-text-muted);
 }
 .crm-view-switch button[data-active="true"] {
-  background-color: var(--mo-accent);
+  /* CRM-DN solid teal (не яркий mint Metodi в dark) */
+  background-color: #0f766e;
+  background-image: linear-gradient(135deg, #0f766e, #0d9488);
   color: #fff;
   border: 1px solid transparent;
   box-shadow: none;
@@ -4795,7 +4801,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 :root[data-theme="dark"] .lux-body,
 :root[data-theme="dark"] .lux-caption,
 :root[data-theme="dark"] .mo-muted {
-  color: #c9d4e6;
+  color: #a9c4bc;
 }
 
 .lux-caption {
