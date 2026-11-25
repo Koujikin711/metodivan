@@ -156,7 +156,7 @@ async def login(
     body: UserLogin,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Token:
-    identifier = body.email
+    identifier = (body.email or "").strip()
     candidates: list[User] = []
 
     if identifier == "admin":
@@ -168,8 +168,9 @@ async def login(
         )
         candidates = list(result.scalars().all())
     elif "@" in identifier:
+        email_key = identifier.lower()
         result = await db.execute(
-            select(User).where(func.lower(User.email) == identifier, User.is_active.is_(True))
+            select(User).where(func.lower(User.email) == email_key, User.is_active.is_(True))
         )
         candidates = list(result.scalars().all())
     else:

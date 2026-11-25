@@ -157,6 +157,7 @@ def send_file(
         kind = "voice"
     elif (mime or "").startswith("audio/"):
         kind = "audio"
+    # Короткий таймаут: Amvera gateway ~50s на весь HTTP (Green+bridge).
     return _post(
         "/send",
         {
@@ -167,7 +168,7 @@ def send_file(
             "mimeType": mime or "application/octet-stream",
             "fileName": filename or safe,
         },
-        45,
+        18,
     )
 
 

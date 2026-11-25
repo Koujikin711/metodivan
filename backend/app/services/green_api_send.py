@@ -153,22 +153,34 @@ async def send_green_file_upload(
     api_token = cfg.get("api_token") or cfg.get("apiToken") or cfg.get("apiTokenInstance")
     upload_name = filename or "file"
     upload_mime = _upload_mime(upload_name, mime)
+    low_name = (upload_name or "").lower()
+    is_voice = (upload_mime or "").startswith("audio/") and (
+        low_name.startswith("voice") or low_name.endswith((".ogg", ".opus"))
+    )
     if not instance_id or not api_token:
         return _via_qr_file(
             chat_id, file_bytes, upload_name, caption, upload_mime, "Нет instance_id/api_token в интеграции"
         )
     media_base = green_media_base_from_config(cfg)
     url = f"{media_base}/waInstance{instance_id}/sendFileByUpload/{api_token}"
+    # Amvera gateway ~50s: Green media + QR fallback должны уложиться раньше,
+    # иначе клиент видит обрыв и «Отправить» «не работает».
+    green_timeout = httpx.Timeout(20.0, connect=8.0)
+    green_error = "Green media недоступен"
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=green_timeout) as client:
             file_part = (upload_name, file_bytes, upload_mime) if upload_mime else (upload_name, file_bytes)
             data: dict[str, Any] = {"chatId": chat_id, "fileName": upload_name}
             if caption:
                 data["caption"] = caption
+            if is_voice:
+                data["typingType"] = "recording"
             r = await client.post(url, data=data, files={"file": file_part})
             if r.status_code >= 400:
-                return _via_qr_file(chat_id, file_bytes, upload_name, caption, upload_mime, (r.text or "")[:400])
-            j = r.json()
-            return True, None, str(j.get("idMessage") or "")
+                green_error = (r.text or f"GREEN media HTTP {r.status_code}")[:400]
+            else:
+                j = r.json() if r.text else {}
+                return True, None, str(j.get("idMessage") or "")
     except Exception as e:
-        return _via_qr_file(chat_id, file_bytes, upload_name, caption, upload_mime, str(e))
+        green_error = str(e)[:400]
+    return _via_qr_file(chat_id, file_bytes, upload_name, caption, upload_mime, green_error)

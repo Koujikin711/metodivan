@@ -1442,9 +1442,14 @@ export function ChatPage() {
   };
 
   const sendVoiceDraft = () => {
-    if (!voiceDraftFile) return;
-    sendMutation.mutate(voiceDraftFile, {
+    if (!voiceDraftFile || sendMutation.isPending) return;
+    setVoiceFinishing(true);
+    const file = voiceDraftFile;
+    sendMutation.mutate(file, {
       onSuccess: () => clearVoiceDraft(),
+      onError: () => {
+        /* toast уже в sendMutation.onError — черновик голоса оставляем для повтора */
+      },
       onSettled: () => setVoiceFinishing(false),
     });
   };
@@ -2235,10 +2240,10 @@ export function ChatPage() {
                     <button
                       type="button"
                       onClick={sendVoiceDraft}
-                      disabled={sendMutation.isPending}
-                      className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-[var(--mo-text)] disabled:opacity-50"
+                      disabled={sendMutation.isPending || voiceFinishing}
+                      className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                     >
-                      Отправить
+                      {sendMutation.isPending || voiceFinishing ? "Отправка…" : "Отправить"}
                     </button>
                     <button
                       type="button"
