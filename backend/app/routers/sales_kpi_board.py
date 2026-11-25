@@ -105,6 +105,7 @@ from app.schemas.sales_kpi import (
 )
 from app.services.sales_kpi_weighted import (
     manual_sale_counts_in_kpi,
+    _as_utc,
     _labels_same_service,
     _manual_sale_fio_product_kinds,
     _norm_kpi_label,
@@ -1446,10 +1447,11 @@ async def _service_earning_detail(
             ym=ym,
             active_manager_ids=active_manager_ids,
         )
-        if board_owner != manager_id and not force_for_me:
-            continue
-        is_new = sale.sold_at is not None and start <= sale.sold_at < end and paid > 0
-        payments = pays_by_sale.get(int(sale.id), [])
+            if board_owner != manager_id and not force_for_me:
+                continue
+            sold_at = _as_utc(sale.sold_at) if sale.sold_at is not None else None
+            is_new = sold_at is not None and start <= sold_at < end and paid > 0
+            payments = pays_by_sale.get(int(sale.id), [])
         brought_amt = Decimal("0.00")
         month_paid_amt = Decimal("0.00")
         for paid_at, amt, mid in payments:
@@ -1537,22 +1539,22 @@ async def _service_earning_detail(
             )
         else:
             note = "показано, не в оплату менеджеру"
-        rows.append(
-            SalesKpiEarningDetailRow(
-                source="kpi",
-                source_id=int(sale.id),
-                client_name=str(sale.client_name or ""),
-                service_amount=price,
-                paid_amount=paid,
-                pay_status=_pay_status(price, paid),
-                sold_at=sale.sold_at,
-                in_brought=brought_amt > 0,
-                brought_amount=brought_amt.quantize(Decimal("0.01")),
-                month_paid_amount=month_paid_amt.quantize(Decimal("0.01")),
-                is_new=is_new,
-                note=note,
-            ),
-        )
+            rows.append(
+                SalesKpiEarningDetailRow(
+                    source="kpi",
+                    source_id=int(sale.id),
+                    client_name=str(sale.client_name or ""),
+                    service_amount=price,
+                    paid_amount=paid,
+                    pay_status=_pay_status(price, paid),
+                    sold_at=sold_at,
+                    in_brought=brought_amt > 0,
+                    brought_amount=brought_amt.quantize(Decimal("0.01")),
+                    month_paid_amount=month_paid_amt.quantize(Decimal("0.01")),
+                    is_new=is_new,
+                    note=note,
+                ),
+            )
 
     # Запись месяца: владелец карточки CRM; если уже есть KPI на то же ФИО+услугу — визит не дублируем.
     if named_dirs or (source_type or "") == "direction":
