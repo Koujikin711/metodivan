@@ -3,11 +3,11 @@ export type ThemeMode = "light" | "dark";
 const STORAGE_KEY = "mo-theme";
 
 export function getStoredTheme(): ThemeMode {
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw === "dark" || raw === "light") return raw;
-  // CRM-DN: тёмный teal как на скринах канбана / РОП (не светлый MetodiOne).
-  return "dark";
+  // CRM-DN: светлая teal-тема по умолчанию (не MetodiOne, не force-dark).
+  return "light";
 }
 
 export function applyTheme(mode: ThemeMode) {
@@ -46,10 +46,10 @@ export function toggleTheme(): ThemeMode {
 
 /** Вызывать до первого рендера React, чтобы не мигал светлый фон. */
 export function initTheme() {
-  // v3: CRM-DN = тёмный стиль канбана; сбрасываем прежний force-light (v2).
-  if (typeof window !== "undefined" && !localStorage.getItem("mo-theme-crmdn-dark-v3")) {
-    localStorage.setItem(STORAGE_KEY, "dark");
-    localStorage.setItem("mo-theme-crmdn-dark-v3", "1");
+  // v4: вернуть CRM-DN teal light (сброс force-dark v3 / Metodi light).
+  if (typeof window !== "undefined" && !localStorage.getItem("mo-theme-crmdn-teal-v4")) {
+    localStorage.setItem(STORAGE_KEY, "light");
+    localStorage.setItem("mo-theme-crmdn-teal-v4", "1");
   }
   applyTheme(getStoredTheme());
 }

@@ -24,14 +24,14 @@
     />
     <script>
       (function () {
-        /* CRM-DN: тёмный стиль канбана по умолчанию (не светлый MetodiOne). */
-        if (!localStorage.getItem("mo-theme-crmdn-dark-v3")) {
-          localStorage.setItem("mo-theme", "dark");
-          localStorage.setItem("mo-theme-crmdn-dark-v3", "1");
+        /* CRM-DN: светлая teal по умолчанию (v4 сбрасывает force-dark v3). */
+        if (!localStorage.getItem("mo-theme-crmdn-teal-v4")) {
+          localStorage.setItem("mo-theme", "light");
+          localStorage.setItem("mo-theme-crmdn-teal-v4", "1");
         }
         var t = localStorage.getItem("mo-theme");
-        if (t === "light") document.documentElement.dataset.theme = "light";
-        else document.documentElement.dataset.theme = "dark";
+        if (t === "dark") document.documentElement.dataset.theme = "dark";
+        else document.documentElement.dataset.theme = "light";
         /* Если бандл не поднялся (деплой Amvera) — тихо перезагрузить, не сидеть на пустом экране. */
         setTimeout(function () {
           var root = document.getElementById("root");

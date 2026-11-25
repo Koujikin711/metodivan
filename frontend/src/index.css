@@ -27,7 +27,7 @@
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
-  /* CRM-DN light: светлый twin палитры Кабинета РОП (teal canvas + белые карточки) */
+  /* CRM-DN: Manrope + teal sales palette */
   --mo-font: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mo-text-2xs: 0.6875rem; /* 11px — минимум для подписей */
   --mo-text-xs: 0.75rem; /* 12px */
@@ -123,34 +123,34 @@
   --mo-text-2xl: 1.5rem;
   --mo-leading: 1.5;
   --mo-leading-tight: 1.28;
-  /* CRM-DN dark (канбан): лесной charcoal + slate-карточки + teal — не MetodiOne indigo */
-  --mo-canvas: #0a0f0d;
-  --mo-bg: #0a0f0d;
-  --mo-bg-top: #0e1614;
-  --mo-surface: #121a17;
-  --mo-surface-elevated: #1e232b;
-  --mo-border: rgba(148, 163, 184, 0.22);
-  --mo-border-strong: rgba(148, 163, 184, 0.36);
-  --mo-text: #f3f7fe;
-  --mo-text-muted: #94a3b8;
-  --mo-accent: #14b8a6;
-  --mo-accent-hover: #2dd4bf;
-  --mo-accent-soft: rgba(20, 184, 166, 0.16);
+  /* CRM-DN dark: зелёный charcoal + teal (не MetodiOne / не navy-slate) */
+  --mo-canvas: #0c1a18;
+  --mo-bg: #0c1a18;
+  --mo-bg-top: #122522;
+  --mo-surface: #152a26;
+  --mo-surface-elevated: #1b342f;
+  --mo-border: rgba(167, 210, 198, 0.22);
+  --mo-border-strong: rgba(167, 210, 198, 0.36);
+  --mo-text: #eef7f4;
+  --mo-text-muted: #a9c4bc;
+  --mo-accent: #2dd4bf;
+  --mo-accent-hover: #5eead4;
+  --mo-accent-soft: rgba(45, 212, 191, 0.16);
   --mo-gold: #99f6e4;
   --mo-shadow-luxury: 0 8px 28px -12px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(45, 212, 191, 0.08);
   --mo-plum-from: #0f766e;
   --mo-plum-to: #14b8a6;
-  --mo-success: #6ecfad;
-  --mo-warning: #e4b07a;
+  --mo-success: #4ade80;
+  --mo-warning: #fcd34d;
   --mo-danger: #fb7185;
   --mo-shell-bg: var(--mo-canvas);
   --mo-nav-hover: rgba(45, 212, 191, 0.12);
-  --mo-nav-active-bg: rgba(45, 212, 191, 0.2);
+  --mo-nav-active-bg: rgba(45, 212, 191, 0.22);
   --mo-sidebar-fg: #eef7f4;
-  --mo-sidebar-fg-muted: #9bb8b0;
+  --mo-sidebar-fg-muted: #a9c4bc;
   --mo-sidebar-item-hover: rgba(45, 212, 191, 0.14);
-  --mo-sidebar-item-active: rgba(45, 212, 191, 0.18);
-  --mo-sidebar-border: rgba(45, 212, 191, 0.22);
+  --mo-sidebar-item-active: rgba(27, 52, 47, 0.95);
+  --mo-sidebar-border: rgba(45, 212, 191, 0.24);
   --mo-sidebar-shadow: none;
   --booking-grid-hatch: rgba(255, 255, 255, 0.06);
   --booking-appt-booked-bg: #1e3a5f;
@@ -512,9 +512,9 @@ html {
 
 :root[data-theme="dark"] .app-shell-bg {
   background:
-    radial-gradient(ellipse 100% 70% at 100% 0%, rgba(45, 212, 191, 0.1), transparent 55%),
-    radial-gradient(ellipse 80% 60% at 0% 100%, rgba(28, 36, 55, 0.55), transparent 52%),
-    linear-gradient(165deg, #121f1c 0%, var(--mo-canvas) 48%, #0a1210 100%);
+    radial-gradient(ellipse 100% 70% at 100% 0%, rgba(45, 212, 191, 0.12), transparent 55%),
+    radial-gradient(ellipse 80% 60% at 0% 100%, rgba(15, 118, 110, 0.1), transparent 50%),
+    linear-gradient(165deg, #122522 0%, var(--mo-canvas) 50%, #0a1614 100%);
 }
 
 .shell-sidebar {
@@ -549,15 +549,16 @@ html {
 }
 
 :root[data-theme="dark"] .shell-sidebar {
-  --mo-sidebar-fg: #eef7f4;
+  --mo-sidebar-fg: #e8f7f3;
   --mo-sidebar-fg-muted: #9bb8b0;
-  --mo-sidebar-item-hover: rgba(20, 184, 166, 0.12);
-  --mo-sidebar-item-active: rgba(20, 184, 166, 0.18);
-  --mo-sidebar-border: rgba(20, 184, 166, 0.2);
-  --mo-sidebar-shadow: inset -1px 0 0 rgba(20, 184, 166, 0.08);
+  --mo-sidebar-item-hover: rgba(45, 212, 191, 0.12);
+  --mo-sidebar-item-active: rgba(45, 212, 191, 0.18);
+  --mo-sidebar-border: rgba(45, 212, 191, 0.22);
+  --mo-sidebar-shadow: inset -1px 0 0 rgba(45, 212, 191, 0.1);
   background:
-    radial-gradient(ellipse 120% 80% at 0% 0%, rgba(20, 184, 166, 0.1), transparent 55%),
-    linear-gradient(180deg, #0e1614 0%, #0a0f0d 55%, #080c0a 100%);
+    radial-gradient(ellipse 120% 80% at 0% 0%, rgba(45, 212, 191, 0.14), transparent 55%),
+    radial-gradient(ellipse 90% 60% at 100% 100%, rgba(15, 118, 110, 0.12), transparent 50%),
+    linear-gradient(180deg, #10241f 0%, #0d1c19 50%, #0a1614 100%);
 }
 
 :root[data-theme="dark"] .shell-sidebar::before,
@@ -3741,13 +3742,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   box-shadow: inset 0 2px 6px rgba(44, 37, 32, 0.04), 0 0 0 2px rgba(212, 175, 55, 0.2);
 }
 :root[data-theme="dark"] .mo-input {
-  background-color: var(--mo-surface-elevated);
-  border-color: var(--mo-border-strong);
-  color: var(--mo-text);
+  background-color: #1b342f;
+  border-color: rgba(167, 210, 198, 0.32);
+  color: #eef7f4;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22);
 }
 :root[data-theme="dark"] .mo-input::placeholder {
-  color: var(--mo-text-muted);
+  color: #8eaea4;
   opacity: 1;
 }
 :root[data-theme="dark"] .mo-input:focus {
@@ -3755,7 +3756,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22), 0 0 0 2px rgba(15, 118, 110, 0.35);
 }
 :root[data-theme="dark"] select.mo-input {
-  background-color: var(--mo-surface-elevated);
+  background-color: #1b342f;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M6 8l4 4 4-4' stroke='%2399f6e4' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
@@ -4316,7 +4317,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 :root[data-theme="dark"] .crm-pill-btn {
-  background: color-mix(in srgb, var(--mo-surface-elevated) 92%, #0b1220);
+  background: color-mix(in srgb, var(--mo-surface-elevated) 92%, #0c1a18);
   border-color: var(--mo-border);
   color: var(--mo-text);
 }
@@ -4335,7 +4336,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 :root[data-theme="dark"] .crm-search-input {
-  background: color-mix(in srgb, var(--mo-surface-elevated) 88%, #0b1220);
+  background: color-mix(in srgb, var(--mo-surface-elevated) 88%, #0c1a18);
   border-color: var(--mo-border);
   color: var(--mo-text);
 }
@@ -5274,7 +5275,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   color: var(--mo-text-muted);
 }
 
-/* Кабинет РОП: те же токены, что и весь CRM-DN (без отдельной navy-палитры). */
+/* CRM-DN: светлая тема по умолчанию (карточки как остальной UI). */
 .rop-dense {
   --rop-card-border: var(--mo-border);
   --rop-card-bg: var(--mo-surface-elevated);
