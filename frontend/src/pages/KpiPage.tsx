@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
+
+import type { AfterWonNavState } from "@/lib/afterWonNavigate";
 
 import { AccessDenied } from "@/components/AccessDenied";
 import { RefusalReasonModal } from "@/components/RefusalReasonModal";
@@ -764,7 +766,16 @@ export function KpiPage() {
   });
   const [selectedLead, setSelectedLead] = useState<KpiLeadPick | null>(null);
   const [leadFromContext, setLeadFromContext] = useState(false);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const wonNavState = (location.state as AfterWonNavState | null)?.openSaleForm
+    ? (location.state as AfterWonNavState)
+    : null;
+  const leadIdParam = searchParams.get("lead_id");
+  const saleFormParam = searchParams.get("sale_form");
+  const saleFormAnchorRef = useRef<HTMLDivElement | null>(null);
+  const consumedWonLeadRef = useRef<number | null>(null);
   const [payDraft, setPayDraft] = useState<Record<number, string>>({});
   const [payDates, setPayDates] = useState<Record<number, string>>({});
   const [expandedDebtorKey, setExpandedDebtorKey] = useState<string | null>(null);
@@ -799,38 +810,85 @@ export function KpiPage() {
     setSaleForm((s) => (s.manager_user_id === id ? s : { ...s, manager_user_id: id }));
   }, [isManager, meQuery.data?.id]);
 
-  // Phase 8B / Удачно: ?lead_id= → open «Добавить продажу» prefilled (ФИО, телефон)
+  // Удачно / ?sale_form=1 / ?lead_id= → сразу вкладка «Пакеты» + открытая форма (до fetch)
+  useLayoutEffect(() => {
+    if (!kpiOps) return;
+    const fromUrl = saleFormParam === "1" || Boolean(leadIdParam);
+    const fromState = Boolean(wonNavState?.openSaleForm);
+    if (!fromUrl && !fromState) return;
+
+    setTab("manual");
+    setSaleFormOpen(true);
+
+    if (wonNavState?.openSaleForm) {
+      const name = (wonNavState.clientName || "").trim();
+      const phone = (wonNavState.clientPhone || "").trim();
+      if (wonNavState.leadId > 0) {
+        setSelectedLead({
+          lead_id: wonNavState.leadId,
+          name: name || `#${wonNavState.leadId}`,
+          phone: phone || null,
+        });
+        setLeadFromContext(true);
+      }
+      if (name || phone) {
+        setSaleForm((s) => ({
+          ...s,
+          client_name: name || s.client_name,
+          client_phone: phone || s.client_phone,
+        }));
+      }
+      if (wonNavState.pipelineId != null) setPipelineId(wonNavState.pipelineId);
+    }
+
+    requestAnimationFrame(() => {
+      saleFormAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [kpiOps, saleFormParam, leadIdParam, wonNavState]);
+
+  // Prefill из API по lead_id (URL или navigate state) + убрать служебные query
   useEffect(() => {
     if (!kpiOps) return;
-    const raw = searchParams.get("lead_id");
+    const raw = leadIdParam || (wonNavState?.leadId != null ? String(wonNavState.leadId) : null);
     if (!raw) return;
     const lid = Number(raw);
     if (!Number.isFinite(lid) || lid < 1) return;
+    if (consumedWonLeadRef.current === lid && !leadIdParam && !saleFormParam) return;
+
     let cancelled = false;
     void (async () => {
       try {
         const lead = await apiFetch<Lead>(`/api/leads/${lid}`);
         if (cancelled) return;
         const phone = (lead.phone_display || lead.phone || "").trim();
+        const name = (lead.name || "").trim();
         setSelectedLead({
           lead_id: lead.id,
-          name: lead.name,
+          name: name || `#${lead.id}`,
           phone: phone || lead.phone || null,
         });
         setLeadFromContext(true);
         setSaleForm((s) => ({
           ...s,
-          client_name: (lead.name || "").trim() || s.client_name,
+          client_name: name || s.client_name,
           client_phone: phone || s.client_phone,
         }));
         if (lead.pipeline_id != null) setPipelineId(lead.pipeline_id);
         setTab("manual");
         setSaleFormOpen(true);
-        toast.success(`Клиент «${(lead.name || "").trim() || `#${lead.id}`}» подставлен — укажите продукт и сумму`);
+        consumedWonLeadRef.current = lid;
+        toast.success(
+          `Клиент «${name || `#${lead.id}`}» подставлен — укажите продукт, стоимость и оплату`,
+        );
+
         const next = new URLSearchParams(searchParams);
         next.delete("lead_id");
-        if (next.get("tab") !== "manual") next.set("tab", "manual");
-        setSearchParams(next, { replace: true });
+        next.delete("sale_form");
+        next.set("tab", "manual");
+        navigate(`${location.pathname}?${next.toString()}`, { replace: true, state: null });
+        requestAnimationFrame(() => {
+          saleFormAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Lead не найден");
       }
@@ -838,8 +896,8 @@ export function KpiPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot from URL
-  }, [kpiOps]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by lead id / flags
+  }, [kpiOps, leadIdParam, saleFormParam, wonNavState?.leadId]);
 
   const qs = useMemo(() => {
     if (!pipelineId) return "";
@@ -1838,7 +1896,7 @@ export function KpiPage() {
             </div>
           ) : null}
 
-          <div className="flex flex-wrap gap-2">
+          <div ref={saleFormAnchorRef} className="flex flex-wrap gap-2 scroll-mt-20">
             <button
               type="button"
               className="btn-primary min-h-12 w-full text-base disabled:opacity-50 sm:min-h-0 sm:w-auto sm:text-sm"

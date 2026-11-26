@@ -21,7 +21,7 @@ import {
   readChatDraft,
   writeChatDraft,
 } from "@/lib/chatDrafts";
-import { afterWonHref } from "@/lib/afterWonNavigate";
+import { afterWonHref, afterWonNavState } from "@/lib/afterWonNavigate";
 import { isRefusalStageName } from "@/lib/leadStageChips";
 import { openLeadCard } from "@/lib/leadReturn";
 import { formatMoney, formatCompactCount } from "@/lib/money";
@@ -1314,7 +1314,9 @@ export function ChatPage() {
             ? "Открываем «Добавить продажу»"
             : "Открываем онлайн-запись — выберите эксперта, дату и сумму",
         );
-        navigate(href);
+        navigate(href, {
+          state: href.startsWith("/kpi") ? afterWonNavState(data) : undefined,
+        });
       }
     },
     onError: (e: Error) => toast.error(e.message),

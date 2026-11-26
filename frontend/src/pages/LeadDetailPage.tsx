@@ -24,7 +24,7 @@ import { BookingAttendancePanel } from "@/components/BookingAttendancePanel";
 import { ReferringDoctorField } from "@/components/ReferringDoctorField";
 import { RefusalReasonModal } from "@/components/RefusalReasonModal";
 import { WaitingCallbackModal } from "@/components/WaitingCallbackModal";
-import { afterWonHref } from "@/lib/afterWonNavigate";
+import { afterWonHref, afterWonNavState } from "@/lib/afterWonNavigate";
 import { useCurrentUserMe } from "@/hooks/useCurrentUserMe";
 import { auditActionLabel, auditDetailsLabel } from "@/lib/auditLabels";
 import { isRefusalStageName, leadStageChips } from "@/lib/leadStageChips";
@@ -235,7 +235,7 @@ export function LeadDetailPage() {
           ...(refusalReason ? { refusal_reason: refusalReason } : {}),
         }),
       }),
-    onSuccess: (_data, vars) => {
+    onSuccess: (data, vars) => {
       toast.success(`Стадия: ${stageButtonLabel(vars.stageName)}`);
       void qc.invalidateQueries({ queryKey: ["lead", leadId] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
@@ -247,7 +247,23 @@ export function LeadDetailPage() {
             ? "Открываем «Добавить продажу»"
             : "Открываем онлайн-запись — выберите эксперта, дату и сумму",
         );
-        navigate(href);
+        const fromApi =
+          data && typeof data === "object" && data !== null && "id" in data
+            ? (data as Lead)
+            : null;
+        const leadSnap = fromApi ??
+          (query.data
+            ? {
+                id: leadId,
+                name: query.data.name,
+                phone: query.data.phone,
+                phone_display: query.data.phone_display,
+                pipeline_id: query.data.pipeline_id,
+              }
+            : { id: leadId });
+        navigate(href, {
+          state: href.startsWith("/kpi") ? afterWonNavState(leadSnap) : undefined,
+        });
       }
     },
     onError: (e: Error) => toast.error(e.message || "Не удалось сменить стадию"),

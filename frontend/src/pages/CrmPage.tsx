@@ -36,7 +36,7 @@ import { RefusalReasonModal } from "@/components/RefusalReasonModal";
 import { WaitingCallbackModal } from "@/components/WaitingCallbackModal";
 import { apiDownloadBlob, apiFetch, getStoredToken, resolveApiUrl } from "@/lib/api";
 import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
-import { afterWonHref } from "@/lib/afterWonNavigate";
+import { afterWonHref, afterWonNavState } from "@/lib/afterWonNavigate";
 import { isRefusalStageName, leadStageChips } from "@/lib/leadStageChips";
 import { formatCompactCount } from "@/lib/money";
 import { theme } from "@/lib/theme";
@@ -1850,7 +1850,18 @@ export function CrmPage() {
         void queryClient.invalidateQueries({ queryKey: ["tasks"] });
         void queryClient.invalidateQueries({ queryKey: ["analytics"] });
         if (String(stageName || "").trim() === "Удачно") {
-          navigate(afterWonHref(leadId, meQuery.data));
+          const href = afterWonHref(leadId, meQuery.data);
+          navigate(href, {
+            state: href.startsWith("/kpi")
+              ? afterWonNavState({
+                  id: leadId,
+                  name: lead.name,
+                  phone: lead.phone,
+                  phone_display: lead.phone_display,
+                  pipeline_id: lead.pipeline_id,
+                })
+              : undefined,
+          });
         }
       } catch (e) {
         setLeads(previous);
