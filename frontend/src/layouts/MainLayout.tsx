@@ -3,6 +3,7 @@ import { AppBanners } from "@/components/AppBanners";
 import { OwnerExpenseConfirmBanner } from "@/components/OwnerExpenseConfirmBanner";
 import { ServerUnavailableGate } from "@/components/ServerUnavailableGate";
 import { TaskDueBanner } from "@/components/TaskDueBanner";
+import { ShellMobileBottomNav } from "@/components/ShellMobileBottomNav";
 import { ShellSidebarNav } from "@/components/ShellSidebarNav";
 import { TariffFeatureOutletGate } from "@/components/TariffFeatureOutletGate";
 import { GradientIconBox } from "@/components/GradientIconBox";
@@ -87,14 +88,25 @@ export function MainLayout() {
   const { showNavForFeature } = useTariffNavAccess();
   const { expanded: sidebarExpanded, toggle: toggleSidebar } = useShellSidebarExpanded();
   const [phoneLayout, setPhoneLayout] = useState(false);
+  const [hideMobileBottomNav, setHideMobileBottomNav] = useState(false);
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 639px)");
+    const mq = window.matchMedia("(max-width: 1023px)");
     const apply = () => setPhoneLayout(mq.matches);
     apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
+  useEffect(() => {
+    const sync = () => {
+      setHideMobileBottomNav(document.documentElement.getAttribute("data-chat-composing") === "1");
+    };
+    sync();
+    const obs = new MutationObserver(sync);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-chat-composing"] });
+    return () => obs.disconnect();
+  }, []);
   const menuExpanded = sidebarExpanded && !phoneLayout;
+  const compactBottomNav = deskSalesEnabled || managerChatFirst;
   usePresenceHeartbeat();
   const sidebarOrderScope = useMemo(
     () => `${role ?? "guest"}:${userId ?? "0"}:${crmMode ?? "pending"}`,
@@ -180,10 +192,10 @@ export function MainLayout() {
   return (
     <div className="relative h-screen overflow-hidden app-shell-bg">
 
-      <div className="relative z-10 flex h-screen min-h-0 flex-row">
+      <div className="relative z-10 flex h-screen min-h-0 flex-col lg:flex-row">
         <aside
           className={[
-            "shell-sidebar print:hidden flex min-h-0 shrink-0 flex-col py-1 sticky top-0 h-dvh max-h-dvh",
+            "shell-sidebar print:hidden hidden min-h-0 shrink-0 flex-col py-1 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:max-h-dvh",
             menuExpanded ? "is-expanded" : "is-collapsed",
           ].join(" ")}
         >
@@ -250,10 +262,14 @@ export function MainLayout() {
           ref={mainRef}
           className={[
             "shell-main relative min-h-0 min-w-0 flex-1 overflow-y-auto text-[var(--mo-text)] sm:px-10 sm:py-10 sm:pb-10 lg:flex lg:flex-col lg:px-14",
-            deskSalesEnabled || managerChatFirst ? "px-2.5 py-1.5 sm:py-2.5" : "px-3 pt-1.5 pb-3 sm:py-4",
+            deskSalesEnabled || managerChatFirst
+              ? "px-2.5 py-1.5 pb-[calc(4.25rem+env(safe-area-inset-bottom))] sm:py-2.5 lg:pb-10"
+              : "px-3 pt-1.5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:py-4 lg:pb-10",
+            hideMobileBottomNav ? "max-lg:!pb-0" : "",
             location.pathname.startsWith("/chat")
               ? [
-                  "max-lg:!px-0 max-lg:!pt-0 max-lg:!pb-0 max-lg:overflow-hidden",
+                  "max-lg:!px-0 max-lg:!pt-0 max-lg:overflow-hidden",
+                  hideMobileBottomNav ? "max-lg:!pb-0" : "max-lg:!pb-[calc(4.25rem+env(safe-area-inset-bottom))]",
                   "max-lg:flex max-lg:h-[100dvh] max-lg:max-h-[100dvh] max-lg:flex-col max-lg:transition-none",
                 ].join(" ")
               : "",
@@ -323,6 +339,34 @@ export function MainLayout() {
           </div>
         </main>
 
+        <ShellMobileBottomNav
+          scope={sidebarOrderScope}
+          isSuperOwner={isSuperOwner}
+          isManagerNav={isManagerNav}
+          isExpert={isExpert}
+          isChiefExpert={isChiefExpert}
+          isAdministrator={isAdministrator}
+          isCurator={isCurator}
+          alsoCurator={alsoCurator}
+          alsoExpert={alsoExpert}
+          isAccountant={isAccountant}
+          isRop={isRop}
+          showFinance={showFinance}
+          showExpenses={showExpenses}
+          showMarketing={showMarketing}
+          showIntegrationsHub={showIntegrationsHub}
+          showKpi={showKpi}
+          bookingEnabled={bookingEnabled}
+          deskSalesEnabled={deskSalesEnabled}
+          chatStagesEnabled={chatStagesEnabled}
+          showExtraServices={showExtraServices}
+          showCuratorJournal={false}
+          hideEmployees={role === "manager"}
+          showNavForFeature={showNavForFeature}
+          compact={compactBottomNav}
+          onLogout={logout}
+          hidden={hideMobileBottomNav}
+        />
       </div>
     </div>
   );

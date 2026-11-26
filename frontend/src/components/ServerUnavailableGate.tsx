@@ -14,9 +14,11 @@ import {
   subscribeServerOutage,
 } from "@/lib/serverOutage";
 
-const HEALTH_POLL_MS = 2000;
+const HEALTH_POLL_MS = 2500;
 /** После долгого outage — полный reload (подтянуть новый бандл после деплоя). */
 const HARD_RELOAD_AFTER_MS = 45_000;
+/** После успешного /health не реагируем на старые error в кэше — иначе мигание UI. */
+const RECOVERY_GRACE_MS = 8_000;
 
 /**
  * Если API лёг (деплой Amvera / 502–504 / сеть) — один экран с роботом,
@@ -28,9 +30,13 @@ export function ServerUnavailableGate({ children }: { children: ReactNode }) {
   const [down, setDown] = useState(() => isServerOutageActive());
   const [message, setMessage] = useState<string | undefined>(() => getServerOutageMessage() || undefined);
   const recoveringRef = useRef(false);
+  const graceUntilRef = useRef(0);
+  const retryBusyRef = useRef(false);
 
   useEffect(() => {
     const scanQueries = () => {
+      if (Date.now() < graceUntilRef.current) return;
+      if (recoveringRef.current) return;
       const queries = queryClient.getQueryCache().getAll();
       for (const q of queries) {
         if (q.state.status !== "error" || q.getObserversCount() === 0) continue;
@@ -54,6 +60,40 @@ export function ServerUnavailableGate({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const clearStaleOutageErrors = () => {
+    queryClient
+      .getQueryCache()
+      .getAll()
+      .forEach((q) => {
+        if (q.state.status === "error" && isServerUnavailableError(q.state.error)) {
+          q.reset();
+        }
+      });
+  };
+
+  const recoverFromOutage = async () => {
+    if (recoveringRef.current) return false;
+    recoveringRef.current = true;
+    try {
+      const res = await fetch("/health", {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      if (!res.ok) return false;
+      graceUntilRef.current = Date.now() + RECOVERY_GRACE_MS;
+      clearStaleOutageErrors();
+      setServerOutage(false);
+      await queryClient.invalidateQueries();
+      await queryClient.refetchQueries({ type: "active" });
+      return true;
+    } catch {
+      return false;
+    } finally {
+      recoveringRef.current = false;
+    }
+  };
+
   useEffect(() => {
     if (!down) return;
     toast.dismiss();
@@ -61,29 +101,10 @@ export function ServerUnavailableGate({ children }: { children: ReactNode }) {
     const startedAt = Date.now();
 
     const probe = async () => {
-      if (cancelled || recoveringRef.current) return;
-      try {
-        const res = await fetch("/health", {
-          method: "GET",
-          headers: { Accept: "application/json" },
-          cache: "no-store",
-        });
-        if (!res.ok) {
-          if (Date.now() - startedAt >= HARD_RELOAD_AFTER_MS) {
-            window.location.reload();
-          }
-          return;
-        }
-        recoveringRef.current = true;
-        setServerOutage(false);
-        await queryClient.invalidateQueries();
-        await queryClient.refetchQueries({ type: "active" });
-      } catch {
-        if (Date.now() - startedAt >= HARD_RELOAD_AFTER_MS) {
-          window.location.reload();
-        }
-      } finally {
-        recoveringRef.current = false;
+      if (cancelled || recoveringRef.current || retryBusyRef.current) return;
+      const ok = await recoverFromOutage();
+      if (!ok && Date.now() - startedAt >= HARD_RELOAD_AFTER_MS) {
+        window.location.reload();
       }
     };
 
@@ -93,6 +114,7 @@ export function ServerUnavailableGate({ children }: { children: ReactNode }) {
       cancelled = true;
       window.clearInterval(id);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recover closes over stable refs
   }, [down, queryClient]);
 
   if (!down) return <>{children}</>;
@@ -102,19 +124,18 @@ export function ServerUnavailableGate({ children }: { children: ReactNode }) {
       <ServerUnavailableState
         message={message}
         onRetry={() => {
+          if (retryBusyRef.current) return;
+          retryBusyRef.current = true;
           void (async () => {
             try {
-              const res = await fetch("/health", {
-                method: "GET",
-                headers: { Accept: "application/json" },
-                cache: "no-store",
-              });
-              if (res.ok) setServerOutage(false);
-            } catch {
-              /* keep overlay */
+              const ok = await recoverFromOutage();
+              if (!ok) {
+                /* keep overlay — health ещё мёртв; не дёргаем refetch */
+                toast.dismiss();
+              }
+            } finally {
+              retryBusyRef.current = false;
             }
-            void queryClient.invalidateQueries();
-            void queryClient.refetchQueries({ type: "active" });
           })();
         }}
       />

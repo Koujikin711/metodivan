@@ -575,6 +575,33 @@ html {
   width: 4.5rem;
 }
 
+/* Телефон/планшет: сайдбар скрыт — нижняя навигация */
+@media (max-width: 1023px) {
+  .shell-sidebar {
+    display: none !important;
+    width: 0 !important;
+    border: 0 !important;
+  }
+}
+
+.shell-mobile-bottom-nav .shell-mobile-nav-link {
+  color: var(--mo-text-muted);
+  touch-action: manipulation;
+}
+
+.shell-mobile-bottom-nav .shell-mobile-nav-link.is-active {
+  color: var(--mo-text);
+}
+
+.shell-mobile-bottom-nav .shell-mobile-nav-link.is-active .shell-nav-icon-box,
+.shell-mobile-bottom-nav .shell-mobile-nav-link.is-active [data-nav-variant] {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--mo-accent) 35%, transparent);
+}
+
+html[data-chat-composing="1"] .shell-mobile-bottom-nav {
+  display: none !important;
+}
+
 .shell-main {
   min-width: 0;
   transition: padding var(--mo-sidebar-duration) var(--mo-sidebar-ease);

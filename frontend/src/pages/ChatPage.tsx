@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
@@ -7,6 +7,7 @@ import { AccessDenied } from "@/components/AccessDenied";
 import { PatientPhone, displayPatientPhone } from "@/components/PatientPhone";
 import { ChatMediaVideo } from "@/components/ChatMediaVideo";
 import { RefusalReasonModal } from "@/components/RefusalReasonModal";
+import { isServerUnavailableError } from "@/components/ServerUnavailableState";
 import { WaitingCallbackModal } from "@/components/WaitingCallbackModal";
 import { useChatRealtime } from "@/hooks/useChatRealtime";
 import { useCurrentUserMe } from "@/hooks/useCurrentUserMe";
@@ -799,6 +800,10 @@ export function ChatPage() {
       if (lastPage.length < THREADS_PAGE_SIZE) return undefined;
       return Number(lastPageParam) + lastPage.length;
     },
+    retry: (count, err) => {
+      if (isServerUnavailableError(err)) return false;
+      return count < 1;
+    },
     refetchInterval: tabVisible ? 20000 : false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
@@ -1039,15 +1044,26 @@ export function ChatPage() {
     queryKey: ["chat-messages", threadId],
     queryFn: () =>
       apiFetch<ChatMessage[]>(`/api/chat/threads/${threadId}/messages?limit=50&offset=0`, {
-        timeoutMs: 25_000,
+        timeoutMs: 18_000,
       }),
     enabled: !!threadId,
     staleTime: 4_000,
-    retry: 1,
+    retry: (count, err) => {
+      /* На телефоне 4×retry при 503 выглядят как вечная «Загрузка сообщений…» */
+      if (isServerUnavailableError(err)) return false;
+      return count < 1;
+    },
     refetchInterval: tabVisible && threadId ? 12_000 : false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
+  const [messagesSlow, setMessagesSlow] = useState(false);
+  useEffect(() => {
+    setMessagesSlow(false);
+    if (!threadId || !messagesQuery.isPending || messagesQuery.data) return;
+    const t = window.setTimeout(() => setMessagesSlow(true), 10_000);
+    return () => window.clearTimeout(t);
+  }, [threadId, messagesQuery.isPending, messagesQuery.dataUpdatedAt]);
   const [olderMessages, setOlderMessages] = useState<ChatMessage[]>([]);
   const [olderOffset, setOlderOffset] = useState(50);
   const [hasOlder, setHasOlder] = useState(true);
@@ -1623,7 +1639,7 @@ export function ChatPage() {
             className="mb-2 w-full shrink-0 rounded-2xl border border-[var(--mo-border)] bg-[var(--mo-surface)] px-3.5 py-2.5 text-sm text-[var(--mo-text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] placeholder:mo-muted max-lg:py-2"
           />
           {threadsQuery.isLoading && <p className="text-sm lux-caption">Загрузка…</p>}
-          {threadsQuery.isError && (
+          {threadsQuery.isError && !isServerUnavailableError(threadsQuery.error) && (
             <p className="text-sm text-[var(--mo-danger)]">{(threadsQuery.error as Error).message}</p>
           )}
           <div
@@ -1945,8 +1961,22 @@ export function ChatPage() {
                   if (box.scrollTop < 70) void loadOlderMessages();
                 }}
               >
-                {messagesQuery.isLoading && !messagesQuery.data && (
-                  <p className="text-sm lux-caption">Загрузка сообщений…</p>
+                {messagesQuery.isPending && !messagesQuery.data && !messagesQuery.isError && (
+                  <div className="space-y-2 py-2">
+                    <p className="text-sm lux-caption">Загрузка сообщений…</p>
+                    {messagesSlow ? (
+                      <div className="space-y-2">
+                        <p className="text-xs mo-muted">Долго нет ответа — можно повторить.</p>
+                        <button
+                          type="button"
+                          className="chat-thread-header-btn min-h-10 px-3"
+                          onClick={() => void messagesQuery.refetch()}
+                        >
+                          Повторить
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 )}
                 {messagesQuery.isError && !messagesQuery.data && (
                   <div className="space-y-2 py-2">
@@ -1955,7 +1985,7 @@ export function ChatPage() {
                     </p>
                     <button
                       type="button"
-                      className="chat-thread-header-btn"
+                      className="chat-thread-header-btn min-h-10 px-3"
                       onClick={() => void messagesQuery.refetch()}
                     >
                       Повторить
