@@ -2,7 +2,11 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from app.services.analytics_overview_money import overview_visit_money, prior_visit_debt
-from app.services.company_month_compare import build_month_compare, kpi_payment_as_visit
+from app.services.company_month_compare import (
+    build_month_compare,
+    kpi_payment_as_visit,
+    kpi_sale_unit_as_visit,
+)
 
 
 def test_overview_skips_course_package_and_cancelled():
@@ -47,45 +51,60 @@ def test_month_compare_uses_cash_date_and_skips_cancelled():
 
 
 def test_month_compare_includes_kpi_protocol_payments():
-    """Протокол из KPI-продаж — в выручку услуги; штуки «записей» только от онлайн-записи."""
+    """Выручка — оплаты KPI; штуки — порог 25% (sale unit) + онлайн-запись."""
     october_cash = datetime(2026, 10, 15, tzinfo=UTC)
     august_cash = datetime(2026, 8, 12, tzinfo=UTC)
     booking = (Decimal("5800"), "completed", october_cash, october_cash, "Протокол")
     kpi_oct = kpi_payment_as_visit(Decimal("12000"), october_cash, "Протокол")
     kpi_aug = kpi_payment_as_visit(Decimal("30000"), august_cash, "Протокол")
+    unit_oct = kpi_sale_unit_as_visit(october_cash, "Протокол")
+    unit_aug = kpi_sale_unit_as_visit(august_cash, "Протокол")
     assert kpi_oct is not None and kpi_aug is not None
-    assert kpi_oct[2] is None  # start_at: не раздувать «Количество записей»
+    assert kpi_oct[2] is None
+    assert unit_oct is not None and unit_aug is not None
     built = build_month_compare(
         datetime(2026, 10, 1).date(),
-        [booking, kpi_oct, kpi_aug],
+        [booking, kpi_oct, kpi_aug, unit_oct, unit_aug],
     )
     proto = next(row for row in built["services"] if row["name"] == "Протокол")
     assert proto["revenue"][-1] == Decimal("17800.00")  # окт: запись 5800 + KPI 12000
-    # Пустые июн–июл срезаны: авг — первый с данными (индекс 0).
     assert built["labels"][0] == "авг"
-    assert proto["revenue"][0] == Decimal("30000.00")  # авг: KPI
+    assert proto["revenue"][0] == Decimal("30000.00")
     assert built["revenue"][-1] == Decimal("17800.00")
-    # Окт: 1 онлайн-запись; авг: только KPI → 0 записей (касса всё равно на графике сумм).
-    assert built["sales"][-1] == 1
-    assert proto["sales"][-1] == 1
-    assert built["sales"][0] == 0
-    assert proto["sales"][0] == 0
+    # Окт: 1 запись + 1 KPI-продажа; авг: 1 KPI-продажа.
+    assert built["sales"][-1] == 2
+    assert proto["sales"][-1] == 2
+    assert built["sales"][0] == 1
+    assert proto["sales"][0] == 1
 
 
-def test_month_compare_kpi_only_month_has_zero_booking_count():
-    """Ноябрь только из оплат «Интенсив» KPI — выручка есть, записей 0 (как в /booking)."""
+def test_month_compare_intensiv_payments_alone_do_not_inflate_count():
+    """Доплаты Интенсив дают выручку, но не штуки — штуки только через sale unit."""
     nov_cash = datetime(2026, 11, 10, tzinfo=UTC)
-    rows = [
+    pays = [
         kpi_payment_as_visit(Decimal("7650"), nov_cash, "Интенсив"),
         kpi_payment_as_visit(Decimal("500"), datetime(2026, 11, 12, tzinfo=UTC), "Интенсив"),
     ]
-    visits = [r for r in rows if r is not None]
-    built = build_month_compare(datetime(2026, 11, 1).date(), visits)
-    assert built["labels"] == ["ноя"]
+    built = build_month_compare(
+        datetime(2026, 11, 1).date(),
+        [r for r in pays if r is not None],
+    )
     assert built["revenue"] == [Decimal("8150.00")]
     assert built["sales"] == [0]
+
+
+def test_month_compare_intensiv_sale_units_show_sold_qty():
+    """24 продажи Интенсив (порог 25%) → количество 24, выручка отдельно из оплат."""
+    nov = datetime(2026, 11, 5, tzinfo=UTC)
+    units = [kpi_sale_unit_as_visit(nov, "Интенсив") for _ in range(24)]
+    pay = kpi_payment_as_visit(Decimal("25140"), nov, "Интенсив")
+    visits = [r for r in [*units, pay] if r is not None]
+    built = build_month_compare(datetime(2026, 11, 1).date(), visits)
+    assert built["labels"] == ["ноя"]
+    assert built["sales"] == [24]
     assert built["services"][0]["name"] == "Интенсив"
-    assert built["services"][0]["sales"] == [0]
+    assert built["services"][0]["sales"] == [24]
+    assert built["revenue"] == [Decimal("25140.00")]
 
 
 def test_month_compare_trims_leading_empty_months():

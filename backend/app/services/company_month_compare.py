@@ -3,10 +3,12 @@
 Касса визитов — дата сдачи денег (paid_at, иначе начало визита).
 Отменённые записи не входят.
 
-Количество («Записи») — только реальные визиты/записи по start_at
-(онлайн-запись или стол продаж). Подтверждённые оплаты KPI «Курс /
-Протокол / Интенсив…» входят только в выручку по paid_at, без +1 к счётчику
-записей — иначе график «Количество» раздувается продажами KPI.
+Количество («Продажи, шт.»):
+- онлайн-запись / стол — по start_at (1 визит = 1 шт.);
+- KPI «Интенсив / Курс / …» — 1 шт. в месяц, когда оплата впервые ≥25%
+  (как fact_qty в отчёте), не по каждой доплате.
+
+Выручка KPI — сумма подтверждённых оплат по paid_at (start_at=None у платежа).
 """
 
 from __future__ import annotations
@@ -53,7 +55,7 @@ def kpi_payment_as_visit(
     paid_at: datetime | None,
     product_name: str | None,
 ) -> tuple | None:
-    """Оплата KPI → кортеж визита: выручка по paid_at, без start_at (не +1 к «Записи»)."""
+    """Оплата KPI → только выручка по paid_at (без +1 к количеству)."""
     paid = Decimal(str(amount or 0))
     if paid <= 0 or paid_at is None:
         return None
@@ -61,14 +63,27 @@ def kpi_payment_as_visit(
     stamp = _utc(paid_at)
     if stamp is None:
         return None
-    # start_at=None → build_month_compare не считает штуки «записей».
+    # start_at=None → не раздувать «Количество» доплатами.
     return (paid, "completed", None, stamp, name)
+
+
+def kpi_sale_unit_as_visit(
+    crossed_at: datetime | None,
+    product_name: str | None,
+) -> tuple | None:
+    """KPI-продажа (порог 25%) → +1 шт. в месяц порога, без выручки."""
+    stamp = _utc(crossed_at)
+    if stamp is None:
+        return None
+    name = (product_name or "").strip() or "Курс / протокол"
+    return (Decimal("0"), "completed", stamp, None, name)
 
 
 def build_month_compare(year_month, visits: list[tuple]) -> dict:
     """visits: (paid, status, start_at|None, paid_at, direction_name).
 
-    start_at=None — только касса (KPI-оплаты); в «Количество записей» не входит.
+    start_at=None — только касса (доплаты KPI); в количество не входит.
+    start_at задан, paid=0 — штуки KPI-продажи / визита без кассы в этой строке.
     """
     months = month_starts(year_month)
     bounds = [month_bounds(m) for m in months]

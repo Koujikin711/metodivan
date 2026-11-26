@@ -157,8 +157,9 @@ export function CompanyMonthCompare({
         <div>
           <h3 className="text-lg font-semibold text-[var(--mo-text)]">Сравнение с прошлыми месяцами</h3>
           <p className="mt-1 text-xs mo-muted">
-            С первого месяца с продажами до выбранного (пустые слева не показываем). Выручка — онлайн-запись
-            и продажи KPI по дате оплаты. Количество — только онлайн-записи месяца без отмен (не оплаты KPI).
+            С первого месяца с продажами до выбранного (пустые слева не показываем). Выручка — по дате оплаты.
+            Количество — онлайн-записи без отмен + KPI-продажи (Интенсив и др.: 1 шт., когда оплата ≥25%, как в
+            плане).
           </p>
         </div>
         <div className="inline-flex rounded-full border border-[var(--mo-border)] p-0.5" role="tablist" aria-label="Что показать">
@@ -192,11 +193,11 @@ export function CompanyMonthCompare({
             {byCount ? (
               <section className="mo-chart-card">
                 <header className="mo-chart-card__head">
-                  <h3>Количество записей</h3>
+                  <h3>Количество продаж</h3>
                   <p>
                     {bars[last] && bars[prev]
                       ? `${bars[last].label}: ${pieces(bars[last].sales)}, к ${bars[prev].label} ${pctDelta(bars[last].sales, bars[prev].sales)}. Выбранный месяц зелёным.`
-                      : "Онлайн-записи месяца без отмен (без продаж KPI). Выбранный месяц зелёным."}
+                      : "Записи + KPI (Интенсив и др. по порогу 25%). Выбранный месяц зелёным."}
                   </p>
                 </header>
                 <div style={{ height: 280 }}>
@@ -213,7 +214,7 @@ export function CompanyMonthCompare({
                         width={36}
                       />
                       <Tooltip content={<ChartTip formatValue={(_key, value) => pieces(value)} />} />
-                      <Bar dataKey="sales" name="Записи" fill="#3b82f6" radius={[8, 8, 0, 0]} maxBarSize={36}>
+                      <Bar dataKey="sales" name="Продажи" fill="#3b82f6" radius={[8, 8, 0, 0]} maxBarSize={36}>
                         <LabelList
                           dataKey="sales"
                           position="top"
@@ -311,7 +312,7 @@ export function CompanyMonthCompare({
             <table className="kpi-data-table w-full text-sm">
               <thead>
                 <tr>
-                  <th className="py-2 pr-3">{byCount ? "Записи, шт." : "Услуга"}</th>
+                  <th className="py-2 pr-3">{byCount ? "Продажи, шт." : "Услуга"}</th>
                   {months.map((label, i) => (
                     <th key={label} className={`py-2 pr-3 ${i === last ? "text-emerald-300" : ""}`}>
                       {label}
@@ -344,7 +345,7 @@ export function CompanyMonthCompare({
                   );
                 })}
                 <tr className="kpi-matrix-row-highlight">
-                  <td className="py-2 pr-3 font-semibold">{byCount ? "Всего записей" : "Выручка"}</td>
+                  <td className="py-2 pr-3 font-semibold">{byCount ? "Всего продаж" : "Выручка"}</td>
                   {(byCount ? data.sales : data.revenue).map((value, i) => (
                     <td key={months[i] ?? i} className="py-2 pr-3 font-semibold tabular-nums">
                       {byCount ? value : shortMoney(Number(value))}

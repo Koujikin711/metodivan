@@ -42,6 +42,7 @@ from app.models import (
 )
 from app.services.company_month_compare import (
     build_month_compare,
+    kpi_sale_unit_as_visit,
     kpi_payment_as_visit,
     month_starts,
 )
@@ -103,6 +104,7 @@ from app.schemas.sales_kpi import (
 )
 from app.services.sales_kpi_weighted import (
     manual_sale_counts_in_kpi,
+    manual_sale_threshold_crossed_at,
     _as_utc,
     _labels_same_service,
     _manual_sale_fio_product_kinds,
@@ -3596,7 +3598,7 @@ async def company_month_compare(
     pipeline_id: int = Query(..., ge=1),
     year_month: str = Query(..., description="YYYY-MM"),
 ) -> SalesKpiMonthCompare:
-    """Шесть месяцев: выручка = визиты + KPI-оплаты; количество = только записи/визиты."""
+    """Шесть месяцев: выручка = визиты + KPI-оплаты; количество = записи + KPI-продажи (порог 25%)."""
     _assert_kpi_access(current_user)
     _assert_company_report_access(current_user)
     await _load_pipeline(db, company_id, pipeline_id)
@@ -3726,6 +3728,54 @@ async def company_month_compare(
         row = kpi_payment_as_visit(amount, sold_at, pname)
         if row is not None:
             visits.append(row)
+
+    # Штуки KPI (= fact_qty): +1 в месяц порога 25%, не по каждой доплате.
+    kpi_sale_rows = (
+        await db.execute(
+            select(
+                SalesKpiManualSale.id,
+                SalesKpiManualSale.service_amount,
+                SalesKpiManualSale.paid_amount,
+                SalesKpiManualSale.sold_at,
+                SalesKpiPlanItem.name,
+            )
+            .join(SalesKpiPlanItem, SalesKpiPlanItem.id == SalesKpiManualSale.plan_item_id)
+            .where(
+                SalesKpiManualSale.company_id == company_id,
+                SalesKpiManualSale.pipeline_id == pipeline_id,
+                SalesKpiManualSale.status.in_(("active", "completed")),
+            ),
+        )
+    ).all()
+    if kpi_sale_rows:
+        sale_ids = [int(r[0]) for r in kpi_sale_rows]
+        pay_for_count = (
+            await db.execute(
+                select(
+                    SalesKpiManualSalePayment.sale_id,
+                    SalesKpiManualSalePayment.paid_at,
+                    SalesKpiManualSalePayment.amount,
+                ).where(SalesKpiManualSalePayment.sale_id.in_(sale_ids)),
+            )
+        ).all()
+        pays_by_sale: dict[int, list[tuple]] = {}
+        for sid, paid_at, amount in pay_for_count:
+            pays_by_sale.setdefault(int(sid), []).append((paid_at, Decimal(str(amount or 0))))
+        for sale_id, service_amount, paid_amount, sold_at, pname in kpi_sale_rows:
+            crossed = manual_sale_threshold_crossed_at(
+                service_amount=Decimal(str(service_amount or 0)),
+                paid_amount=Decimal(str(paid_amount or 0)),
+                sold_at=sold_at,
+                payments=pays_by_sale.get(int(sale_id), []),
+            )
+            if crossed is None:
+                continue
+            crossed_utc = _as_utc(crossed)
+            if crossed_utc < window_start or crossed_utc >= window_end:
+                continue
+            unit = kpi_sale_unit_as_visit(crossed_utc, pname)
+            if unit is not None:
+                visits.append(unit)
 
     built = build_month_compare(ym, visits)
     return SalesKpiMonthCompare(
