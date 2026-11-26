@@ -3,8 +3,10 @@
 Касса визитов — дата сдачи денег (paid_at, иначе начало визита).
 Отменённые записи не входят.
 
-Плюс подтверждённые оплаты KPI «Курс / Протокол / …» по paid_at и имени
-продукта плана — иначе протоколы из вкладки продаж не видны на графике.
+Количество («Записи») — только реальные визиты/записи по start_at
+(онлайн-запись или стол продаж). Подтверждённые оплаты KPI «Курс /
+Протокол / Интенсив…» входят только в выручку по paid_at, без +1 к счётчику
+записей — иначе график «Количество» раздувается продажами KPI.
 """
 
 from __future__ import annotations
@@ -51,7 +53,7 @@ def kpi_payment_as_visit(
     paid_at: datetime | None,
     product_name: str | None,
 ) -> tuple | None:
-    """Строка оплаты KPI → тот же формат, что у визита для build_month_compare."""
+    """Оплата KPI → кортеж визита: выручка по paid_at, без start_at (не +1 к «Записи»)."""
     paid = Decimal(str(amount or 0))
     if paid <= 0 or paid_at is None:
         return None
@@ -59,11 +61,15 @@ def kpi_payment_as_visit(
     stamp = _utc(paid_at)
     if stamp is None:
         return None
-    return (paid, "completed", stamp, stamp, name)
+    # start_at=None → build_month_compare не считает штуки «записей».
+    return (paid, "completed", None, stamp, name)
 
 
 def build_month_compare(year_month, visits: list[tuple]) -> dict:
-    """visits: (paid, status, start_at, paid_at, direction_name)."""
+    """visits: (paid, status, start_at|None, paid_at, direction_name).
+
+    start_at=None — только касса (KPI-оплаты); в «Количество записей» не входит.
+    """
     months = month_starts(year_month)
     bounds = [month_bounds(m) for m in months]
     n = len(months)
@@ -84,7 +90,8 @@ def build_month_compare(year_month, visits: list[tuple]) -> dict:
             if _in_span(cash_at, start, end) and paid > 0:
                 revenue[i] += paid
                 rev_row[i] += paid
-            if _in_span(start_at, start, end):
+            # Только реальные визиты с датой приёма/продажи — не синтетика KPI.
+            if start_at is not None and _in_span(start_at, start, end):
                 sales[i] += 1
                 sale_row[i] += 1
 

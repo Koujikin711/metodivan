@@ -3596,7 +3596,7 @@ async def company_month_compare(
     pipeline_id: int = Query(..., ge=1),
     year_month: str = Query(..., description="YYYY-MM"),
 ) -> SalesKpiMonthCompare:
-    """Шесть месяцев: касса визитов + подтверждённые оплаты курсов/протоколов KPI."""
+    """Шесть месяцев: выручка = визиты + KPI-оплаты; количество = только записи/визиты."""
     _assert_kpi_access(current_user)
     _assert_company_report_access(current_user)
     await _load_pipeline(db, company_id, pipeline_id)

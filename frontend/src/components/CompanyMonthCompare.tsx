@@ -157,8 +157,8 @@ export function CompanyMonthCompare({
         <div>
           <h3 className="text-lg font-semibold text-[var(--mo-text)]">Сравнение с прошлыми месяцами</h3>
           <p className="mt-1 text-xs mo-muted">
-            С первого месяца с продажами до выбранного (пустые слева не показываем). Выручка — все
-            продажи по дате оплаты. Количество — записи месяца без отмен.
+            С первого месяца с продажами до выбранного (пустые слева не показываем). Выручка — онлайн-запись
+            и продажи KPI по дате оплаты. Количество — только онлайн-записи месяца без отмен (не оплаты KPI).
           </p>
         </div>
         <div className="inline-flex rounded-full border border-[var(--mo-border)] p-0.5" role="tablist" aria-label="Что показать">
@@ -196,7 +196,7 @@ export function CompanyMonthCompare({
                   <p>
                     {bars[last] && bars[prev]
                       ? `${bars[last].label}: ${pieces(bars[last].sales)}, к ${bars[prev].label} ${pctDelta(bars[last].sales, bars[prev].sales)}. Выбранный месяц зелёным.`
-                      : "Записи месяца без отмен. Выбранный месяц зелёным."}
+                      : "Онлайн-записи месяца без отмен (без продаж KPI). Выбранный месяц зелёным."}
                   </p>
                 </header>
                 <div style={{ height: 280 }}>
