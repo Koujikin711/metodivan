@@ -242,11 +242,7 @@ export function LeadDetailPage() {
       void qc.invalidateQueries({ queryKey: ["chat-threads"] });
       if (vars.stageName.trim() === "Удачно") {
         const href = afterWonHref(leadId, meQuery.data);
-        toast.success(
-          href.startsWith("/kpi")
-            ? "Открываем «Добавить продажу»"
-            : "Открываем онлайн-запись — выберите эксперта, дату и сумму",
-        );
+        toast.success("Открываем «Добавить продажу»");
         const fromApi =
           data && typeof data === "object" && data !== null && "id" in data
             ? (data as Lead)
@@ -261,9 +257,7 @@ export function LeadDetailPage() {
                 pipeline_id: query.data.pipeline_id,
               }
             : { id: leadId });
-        navigate(href, {
-          state: href.startsWith("/kpi") ? afterWonNavState(leadSnap) : undefined,
-        });
+        navigate(href, { state: afterWonNavState(leadSnap) });
       }
     },
     onError: (e: Error) => toast.error(e.message || "Не удалось сменить стадию"),

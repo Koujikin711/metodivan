@@ -1309,14 +1309,8 @@ export function ChatPage() {
       void qc.invalidateQueries({ queryKey: ["leads"] });
       if (salesChatMode && stageName.trim() === "Удачно") {
         const href = afterWonHref(data.id, meQuery.data);
-        toast.success(
-          href.startsWith("/kpi")
-            ? "Открываем «Добавить продажу»"
-            : "Открываем онлайн-запись — выберите эксперта, дату и сумму",
-        );
-        navigate(href, {
-          state: href.startsWith("/kpi") ? afterWonNavState(data) : undefined,
-        });
+        toast.success("Открываем «Добавить продажу»");
+        navigate(href, { state: afterWonNavState(data) });
       }
     },
     onError: (e: Error) => toast.error(e.message),

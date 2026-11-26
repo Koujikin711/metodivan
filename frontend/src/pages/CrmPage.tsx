@@ -1852,15 +1852,13 @@ export function CrmPage() {
         if (String(stageName || "").trim() === "Удачно") {
           const href = afterWonHref(leadId, meQuery.data);
           navigate(href, {
-            state: href.startsWith("/kpi")
-              ? afterWonNavState({
-                  id: leadId,
-                  name: lead.name,
-                  phone: lead.phone,
-                  phone_display: lead.phone_display,
-                  pipeline_id: lead.pipeline_id,
-                })
-              : undefined,
+            state: afterWonNavState({
+              id: leadId,
+              name: lead.name,
+              phone: lead.phone,
+              phone_display: lead.phone_display,
+              pipeline_id: lead.pipeline_id,
+            }),
           });
         }
       } catch (e) {
