@@ -21,6 +21,7 @@ import {
   readChatDraft,
   writeChatDraft,
 } from "@/lib/chatDrafts";
+import { afterWonHref } from "@/lib/afterWonNavigate";
 import { isRefusalStageName } from "@/lib/leadStageChips";
 import { openLeadCard } from "@/lib/leadReturn";
 import { formatMoney, formatCompactCount } from "@/lib/money";
@@ -720,8 +721,6 @@ export function ChatPage() {
   const companyId = getActiveCompanyId();
   const meQuery = useCurrentUserMe();
   const salesChatMode = meQuery.data?.chat_stages_enabled !== false;
-  const salesSpace =
-    meQuery.data?.crm_mode === "sales" || Boolean(meQuery.data?.desk_sales_enabled);
   const showManagerChatBuckets =
     userRole === "manager" ||
     userRole === "admin" ||
@@ -1257,7 +1256,18 @@ export function ChatPage() {
     }
   }
 
-  const statusStagesPipelineId = activeThread?.pipeline_id ?? null;
+  const leadForStatusQuery = useQuery({
+    queryKey: ["lead", activeThread?.lead_id, "chat-status-pipeline"],
+    queryFn: () => apiFetch<Lead>(`/api/leads/${activeThread!.lead_id}`),
+    enabled: Boolean(
+      salesChatMode &&
+        statusOpen &&
+        activeThread?.lead_id &&
+        activeThread.pipeline_id == null,
+    ),
+  });
+  const statusStagesPipelineId =
+    activeThread?.pipeline_id ?? leadForStatusQuery.data?.pipeline_id ?? null;
   const statusStagesQuery = useQuery({
     queryKey: ["stages", statusStagesPipelineId, "chat-status"],
     queryFn: () =>
@@ -1298,13 +1308,13 @@ export function ChatPage() {
       void qc.invalidateQueries({ queryKey: ["chat-thread-bucket-counts"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
       if (salesChatMode && stageName.trim() === "Удачно") {
-        if (salesSpace || meQuery.data?.booking_enabled === false) {
-          toast.success("Открываем окно продаж");
-          navigate(`/sales?lead_id=${data.id}`);
-        } else {
-          toast.success("Открываем онлайн-запись — выберите эксперта, дату и сумму");
-          navigate(`/booking?lead_id=${data.id}`);
-        }
+        const href = afterWonHref(data.id, meQuery.data);
+        toast.success(
+          href.startsWith("/sales")
+            ? "Открываем окно продаж"
+            : "Открываем онлайн-запись — выберите эксперта, дату и сумму",
+        );
+        navigate(href);
       }
     },
     onError: (e: Error) => toast.error(e.message),
@@ -1942,8 +1952,23 @@ export function ChatPage() {
                           </button>
                         );
                       })}
-                    {statusStagesQuery.isLoading ? (
+                    {statusStagesQuery.isLoading ||
+                    (activeThread.pipeline_id == null && leadForStatusQuery.isLoading) ? (
                       <span className="text-xs mo-muted">Загрузка стадий…</span>
+                    ) : null}
+                    {!statusStagesQuery.isLoading &&
+                    statusStagesPipelineId != null &&
+                    (statusStagesQuery.data ?? []).every((s) => s.name.trim() !== "Удачно") ? (
+                      <span className="text-xs text-[var(--mo-danger)]">
+                        В воронке нет стадии «Удачно»
+                      </span>
+                    ) : null}
+                    {statusOpen &&
+                    activeThread.pipeline_id == null &&
+                    leadForStatusQuery.isError ? (
+                      <span className="text-xs text-[var(--mo-danger)]">
+                        Не удалось определить воронку лида
+                      </span>
                     ) : null}
                   </div>
                 </div>

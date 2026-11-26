@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import { leadBackHref } from "@/lib/leadReturn";
@@ -24,6 +24,8 @@ import { BookingAttendancePanel } from "@/components/BookingAttendancePanel";
 import { ReferringDoctorField } from "@/components/ReferringDoctorField";
 import { RefusalReasonModal } from "@/components/RefusalReasonModal";
 import { WaitingCallbackModal } from "@/components/WaitingCallbackModal";
+import { afterWonHref } from "@/lib/afterWonNavigate";
+import { useCurrentUserMe } from "@/hooks/useCurrentUserMe";
 import { auditActionLabel, auditDetailsLabel } from "@/lib/auditLabels";
 import { isRefusalStageName, leadStageChips } from "@/lib/leadStageChips";
 import type {
@@ -112,6 +114,8 @@ function LeadRopTransfer({
 export function LeadDetailPage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const meQuery = useCurrentUserMe();
   const leadId = Number(id);
   const qc = useQueryClient();
   const [auditOpen, setAuditOpen] = useState(false);
@@ -236,6 +240,15 @@ export function LeadDetailPage() {
       void qc.invalidateQueries({ queryKey: ["lead", leadId] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["chat-threads"] });
+      if (vars.stageName.trim() === "Удачно") {
+        const href = afterWonHref(leadId, meQuery.data);
+        toast.success(
+          href.startsWith("/sales")
+            ? "Открываем окно продаж"
+            : "Открываем онлайн-запись — выберите эксперта, дату и сумму",
+        );
+        navigate(href);
+      }
     },
     onError: (e: Error) => toast.error(e.message || "Не удалось сменить стадию"),
   });

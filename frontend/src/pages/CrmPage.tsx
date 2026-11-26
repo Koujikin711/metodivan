@@ -36,6 +36,7 @@ import { RefusalReasonModal } from "@/components/RefusalReasonModal";
 import { WaitingCallbackModal } from "@/components/WaitingCallbackModal";
 import { apiDownloadBlob, apiFetch, getStoredToken, resolveApiUrl } from "@/lib/api";
 import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
+import { afterWonHref } from "@/lib/afterWonNavigate";
 import { isRefusalStageName, leadStageChips } from "@/lib/leadStageChips";
 import { formatCompactCount } from "@/lib/money";
 import { theme } from "@/lib/theme";
@@ -910,6 +911,7 @@ function KanbanColumn({
 
 export function CrmPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const currentRole = useMemo(() => decodeRoleFromToken(getStoredToken()), []);
   const meQuery = useCurrentUserMe();
@@ -1847,12 +1849,15 @@ export function CrmPage() {
         }
         void queryClient.invalidateQueries({ queryKey: ["tasks"] });
         void queryClient.invalidateQueries({ queryKey: ["analytics"] });
+        if (String(stageName || "").trim() === "Удачно") {
+          navigate(afterWonHref(leadId, meQuery.data));
+        }
       } catch (e) {
         setLeads(previous);
         setKanbanError(e instanceof Error ? e.message : "Не удалось обновить этап");
       }
     },
-    [leads, queryClient, sortedStages, pipelineId],
+    [leads, queryClient, sortedStages, pipelineId, navigate, meQuery.data],
   );
 
   const onDragCancel = useCallback(() => {

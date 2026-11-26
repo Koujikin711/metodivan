@@ -1,14 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { ActivitySphereField } from "@/components/ActivitySphereField";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { apiFetch } from "@/lib/api";
 import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
 import { useCurrentUserMe } from "@/hooks/useCurrentUserMe";
-import type { ManagerDeskSale, Pipeline } from "@/lib/types";
+import type { Lead, ManagerDeskSale, Pipeline } from "@/lib/types";
 
 function formatMoney(v: string | number) {
   const n = typeof v === "number" ? v : Number(v);
@@ -35,7 +35,14 @@ const fieldClass = "mo-input mt-1.5 w-full";
 export function ManagerSalesPage() {
   const me = useCurrentUserMe();
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const enabled = Boolean(me.data?.desk_sales_enabled);
+  const leadFromQuery = useMemo(() => {
+    const raw = searchParams.get("lead_id");
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [searchParams]);
 
   const pipelinesQuery = useQuery({
     queryKey: ["pipelines"],
@@ -49,6 +56,12 @@ export function ManagerSalesPage() {
     enabled,
   });
 
+  const leadQuery = useQuery({
+    queryKey: ["lead", leadFromQuery, "desk-sale-prefill"],
+    queryFn: () => apiFetch<Lead>(`/api/leads/${leadFromQuery}`),
+    enabled: enabled && leadFromQuery != null,
+  });
+
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [activitySphere, setActivitySphere] = useState("");
@@ -57,6 +70,21 @@ export function ManagerSalesPage() {
   const [pipelineId, setPipelineId] = useState<number | "">("");
   const [note, setNote] = useState("");
   const [showNote, setShowNote] = useState(false);
+  const [prefilledLeadId, setPrefilledLeadId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!leadQuery.data || leadFromQuery == null) return;
+    if (prefilledLeadId === leadFromQuery) return;
+    const lead = leadQuery.data;
+    setClientName((lead.name || "").trim());
+    setClientPhone((lead.phone_display || lead.phone || "").trim());
+    if (lead.pipeline_id != null) setPipelineId(lead.pipeline_id);
+    setPrefilledLeadId(leadFromQuery);
+    toast.success(`Лид #${lead.id} подставлен — укажите сумму и оплату`);
+    const next = new URLSearchParams(searchParams);
+    next.delete("lead_id");
+    setSearchParams(next, { replace: true });
+  }, [leadQuery.data, leadFromQuery, prefilledLeadId, searchParams, setSearchParams]);
 
   const createMutation = useMutation({
     mutationFn: () =>

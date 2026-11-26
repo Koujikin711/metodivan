@@ -1007,7 +1007,8 @@ async def _fetch_thread_read_row(
         ChatThread.provider,
         ChatThread.external_chat_id,
         ChatThread.title,
-        ChatThread.pipeline_id,
+        # Тред без pipeline_id (Sheets/IG stubs) — берём воронку стадии лида, иначе Status «Удачно» пустой.
+        func.coalesce(ChatThread.pipeline_id, PipelineStage.pipeline_id).label("pipeline_id"),
         ChatThread.updated_at,
         first_message_at_sq.label("first_message_at"),
         last_direction_sq.label("last_message_direction"),
@@ -1207,7 +1208,7 @@ async def list_threads(
         ChatThread.provider,
         ChatThread.external_chat_id,
         ChatThread.title,
-        ChatThread.pipeline_id,
+        func.coalesce(ChatThread.pipeline_id, PipelineStage.pipeline_id).label("pipeline_id"),
         ChatThread.updated_at,
         first_message_at_sq.label("first_message_at"),
         last_direction_sq.label("last_message_direction"),
