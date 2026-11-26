@@ -36,7 +36,7 @@ import { RefusalReasonModal } from "@/components/RefusalReasonModal";
 import { WaitingCallbackModal } from "@/components/WaitingCallbackModal";
 import { apiDownloadBlob, apiFetch, getStoredToken, resolveApiUrl } from "@/lib/api";
 import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
-import { afterWonHref, afterWonNavState } from "@/lib/afterWonNavigate";
+import { afterWonHref, afterWonNavState, stashAfterWonSale } from "@/lib/afterWonNavigate";
 import { isRefusalStageName, leadStageChips } from "@/lib/leadStageChips";
 import { formatCompactCount } from "@/lib/money";
 import { theme } from "@/lib/theme";
@@ -1851,15 +1851,15 @@ export function CrmPage() {
         void queryClient.invalidateQueries({ queryKey: ["analytics"] });
         if (String(stageName || "").trim() === "Удачно") {
           const href = afterWonHref(leadId, meQuery.data);
-          navigate(href, {
-            state: afterWonNavState({
-              id: leadId,
-              name: lead.name,
-              phone: lead.phone,
-              phone_display: lead.phone_display,
-              pipeline_id: lead.pipeline_id,
-            }),
+          const navState = afterWonNavState({
+            id: leadId,
+            name: lead.name,
+            phone: lead.phone,
+            phone_display: lead.phone_display,
+            pipeline_id: lead.pipeline_id,
           });
+          stashAfterWonSale(navState);
+          navigate(href, { state: navState });
         }
       } catch (e) {
         setLeads(previous);

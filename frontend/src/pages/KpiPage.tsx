@@ -4,7 +4,10 @@ import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 
-import type { AfterWonNavState } from "@/lib/afterWonNavigate";
+import {
+  takeAfterWonSaleStash,
+  type AfterWonNavState,
+} from "@/lib/afterWonNavigate";
 
 import { AccessDenied } from "@/components/AccessDenied";
 import { RefusalReasonModal } from "@/components/RefusalReasonModal";
@@ -769,9 +772,11 @@ export function KpiPage() {
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const wonNavState = (location.state as AfterWonNavState | null)?.openSaleForm
+  const locationWonState = (location.state as AfterWonNavState | null)?.openSaleForm
     ? (location.state as AfterWonNavState)
     : null;
+  const [stashedWonState] = useState<AfterWonNavState | null>(() => takeAfterWonSaleStash());
+  const wonNavState = locationWonState ?? stashedWonState;
   const leadIdParam = searchParams.get("lead_id");
   const saleFormParam = searchParams.get("sale_form");
   const saleFormAnchorRef = useRef<HTMLDivElement | null>(null);

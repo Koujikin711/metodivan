@@ -18,6 +18,8 @@ export type AfterWonNavState = {
   pipelineId?: number | null;
 };
 
+export const AFTER_WON_SALE_STORAGE_KEY = "mo_after_won_sale";
+
 export function afterWonHref(
   leadId: number,
   me?: {
@@ -46,4 +48,26 @@ export function afterWonNavState(lead: {
     clientPhone: phone || undefined,
     pipelineId: lead.pipeline_id ?? null,
   };
+}
+
+/** Persist snapshot so KPI opens form even if query/state is lost (cache / soft nav). */
+export function stashAfterWonSale(state: AfterWonNavState): void {
+  try {
+    sessionStorage.setItem(AFTER_WON_SALE_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+export function takeAfterWonSaleStash(): AfterWonNavState | null {
+  try {
+    const raw = sessionStorage.getItem(AFTER_WON_SALE_STORAGE_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(AFTER_WON_SALE_STORAGE_KEY);
+    const parsed = JSON.parse(raw) as AfterWonNavState;
+    if (!parsed?.openSaleForm || !(parsed.leadId > 0)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }

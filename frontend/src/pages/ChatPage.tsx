@@ -21,7 +21,7 @@ import {
   readChatDraft,
   writeChatDraft,
 } from "@/lib/chatDrafts";
-import { afterWonHref, afterWonNavState } from "@/lib/afterWonNavigate";
+import { afterWonHref, afterWonNavState, stashAfterWonSale } from "@/lib/afterWonNavigate";
 import { isRefusalStageName } from "@/lib/leadStageChips";
 import { openLeadCard } from "@/lib/leadReturn";
 import { formatMoney, formatCompactCount } from "@/lib/money";
@@ -1309,8 +1309,10 @@ export function ChatPage() {
       void qc.invalidateQueries({ queryKey: ["leads"] });
       if (salesChatMode && stageName.trim() === "Удачно") {
         const href = afterWonHref(data.id, meQuery.data);
+        const navState = afterWonNavState(data);
+        stashAfterWonSale(navState);
         toast.success("Открываем «Добавить продажу»");
-        navigate(href, { state: afterWonNavState(data) });
+        navigate(href, { state: navState });
       }
     },
     onError: (e: Error) => toast.error(e.message),

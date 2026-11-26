@@ -24,7 +24,7 @@ import { BookingAttendancePanel } from "@/components/BookingAttendancePanel";
 import { ReferringDoctorField } from "@/components/ReferringDoctorField";
 import { RefusalReasonModal } from "@/components/RefusalReasonModal";
 import { WaitingCallbackModal } from "@/components/WaitingCallbackModal";
-import { afterWonHref, afterWonNavState } from "@/lib/afterWonNavigate";
+import { afterWonHref, afterWonNavState, stashAfterWonSale } from "@/lib/afterWonNavigate";
 import { useCurrentUserMe } from "@/hooks/useCurrentUserMe";
 import { auditActionLabel, auditDetailsLabel } from "@/lib/auditLabels";
 import { isRefusalStageName, leadStageChips } from "@/lib/leadStageChips";
@@ -257,7 +257,9 @@ export function LeadDetailPage() {
                 pipeline_id: query.data.pipeline_id,
               }
             : { id: leadId });
-        navigate(href, { state: afterWonNavState(leadSnap) });
+        const navState = afterWonNavState(leadSnap);
+        stashAfterWonSale(navState);
+        navigate(href, { state: navState });
       }
     },
     onError: (e: Error) => toast.error(e.message || "Не удалось сменить стадию"),
