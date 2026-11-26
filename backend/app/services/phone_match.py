@@ -28,6 +28,9 @@ def whatsapp_e164_digits(value: str | None, *, default_cc: str = "992") -> str:
     # Локальный мобильный TJ: 9 цифр (часто начинают с 9)
     if len(digits) == 9:
         return f"{cc}{digits}"
+    # 10 цифр без кода (часто «907…» вместо 992+9) → 992 + последние 9.
+    if len(digits) == 10:
+        return f"{cc}{digits[-9:]}"
     return digits
 
 

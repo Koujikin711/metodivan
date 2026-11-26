@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
@@ -77,6 +78,8 @@ from app.services.lead_import import (
 )
 from app.schemas.deal import DealRead, ExtraServiceAddBody, ProtocolConfirmBody
 from app.schemas.deal import ProtocolFinishBody
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/leads", tags=["leads"])
 
@@ -2850,6 +2853,14 @@ async def update_lead_status(
             + ("; assign_to_me" if body.assign_to_me else "")
         ),
     )
+    # «Удачно» без чата → сразу stub, чтобы badge в Чатах = канбан.
+    if to_name == "Удачно":
+        try:
+            from app.routers.chat import _ensure_whatsapp_thread_for_lead
+
+            await _ensure_whatsapp_thread_for_lead(db, company_id=company_id, lead=lead)
+        except Exception:
+            logger.exception("whatsapp stub after Удачно lead=%s", lead.id)
     await db.refresh(lead, ["stage"])
     read = await _lead_to_read_with_manager(db, lead, current_user)
     automation_task_created = await process_lead_automation(db, lead_id, body.status_id)

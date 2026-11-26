@@ -848,11 +848,25 @@ async def _ensure_whatsapp_stubs_for_new_leads(
     company_id: int,
     current_user,
     pipeline_ids: set[int] | list[int],
+    include_won: bool = True,
 ) -> int:
-    """Stub GREEN API-треды для лидов с телефоном без чата — чтобы были в списке Чатов."""
+    """Stub GREEN API-треды для лидов с телефоном без чата — чтобы были в списке Чатов.
+
+    Важно: «Удачно» тоже — иначе канбан 36, а чат 25 (нет stub после продажи).
+    """
     allowed = {int(x) for x in pipeline_ids}
     if not allowed:
         return 0
+    stage_names = [
+        "Новый лид",
+        "Новый",
+        "В обработке",
+        "В работе",
+        "В ожидании",
+        "Не ответили",
+    ]
+    if include_won:
+        stage_names.append("Удачно")
     has_thread = exists(
         select(ChatThread.id).where(
             ChatThread.company_id == company_id,
@@ -866,15 +880,13 @@ async def _ensure_whatsapp_stubs_for_new_leads(
         .where(
             Lead.company_id == company_id,
             PipelineStage.pipeline_id.in_(allowed),
-            PipelineStage.name.in_(
-                ("Новый лид", "Новый", "В обработке", "В работе", "В ожидании"),
-            ),
+            PipelineStage.name.in_(tuple(stage_names)),
             Lead.phone.is_not(None),
             Lead.phone != "",
             ~has_thread,
         )
         .order_by(Lead.id.desc())
-        .limit(80)
+        .limit(200)
     )
     if current_user.role != UserRole.owner:
         q = q.where(manager_lead_visibility(current_user.id))
@@ -1084,7 +1096,14 @@ async def thread_bucket_counts(
         allowed = await _manager_pipeline_ids(db, current_user.id)
     if not allowed:
         return ChatThreadBucketCounts()
-    # Не создаём stubs на каждый poll счётчиков — только в list_threads(awaiting_reply).
+    # Stubs для «Удачно» без чата — иначе badge 25 при канбане 36.
+    await _ensure_whatsapp_stubs_for_new_leads(
+        db,
+        company_id=company_id,
+        current_user=current_user,
+        pipeline_ids=allowed,
+        include_won=True,
+    )
     term = (q or "").strip()
     last_direction_sq = ChatThread.last_message_direction
     base = (
@@ -1227,12 +1246,14 @@ async def list_threads(
         allowed = await _manager_pipeline_ids(db, current_user.id)
         if not allowed:
             return []
-        if bucket == "awaiting_reply" or bucket is None:
+        # Stubs и для «Удачно» / любой вкладки — иначе счётчик воронки чата отстаёт от канбана.
+        if bucket == "awaiting_reply" or bucket is None or stage_key in ("won", "in_progress", "waiting", "new", "unanswered"):
             await _ensure_whatsapp_stubs_for_new_leads(
                 db,
                 company_id=company_id,
                 current_user=current_user,
                 pipeline_ids=allowed,
+                include_won=True,
             )
         query = query.where(
             _thread_pipeline_allowed(allowed),
@@ -1247,19 +1268,19 @@ async def list_threads(
             stage_key=stage_key,
         )
     elif is_owner_view and (stage_key or bucket):
-        if bucket == "awaiting_reply":
-            owner_pipes = {
-                int(r[0])
-                for r in (
-                    await db.execute(select(Pipeline.id).where(Pipeline.company_id == company_id))
-                ).all()
-            }
-            await _ensure_whatsapp_stubs_for_new_leads(
-                db,
-                company_id=company_id,
-                current_user=current_user,
-                pipeline_ids=owner_pipes,
-            )
+        owner_pipes = {
+            int(r[0])
+            for r in (
+                await db.execute(select(Pipeline.id).where(Pipeline.company_id == company_id))
+            ).all()
+        }
+        await _ensure_whatsapp_stubs_for_new_leads(
+            db,
+            company_id=company_id,
+            current_user=current_user,
+            pipeline_ids=owner_pipes,
+            include_won=True,
+        )
         query = _apply_manager_thread_bucket(
             query,
             bucket=bucket,

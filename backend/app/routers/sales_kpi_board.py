@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, date, datetime
-from zoneinfo import ZoneInfo
-from decimal import Decimal
 import calendar
+import logging
+from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, delete, exists, func, or_, select
@@ -17,6 +18,8 @@ from sqlalchemy.orm import aliased
 from app.config import settings
 from app.core.deps import CurrentCompanyId, CurrentUser
 from app.database import AsyncSessionLocal, get_db
+
+logger = logging.getLogger(__name__)
 from app.models import (
     BookingAppointment,
     BookingDirection,
@@ -417,6 +420,64 @@ def _manual_open_debt(status: str, service_amount: Decimal, paid_amount: Decimal
 def _manual_counts_in_kpi(service_amount: Decimal, paid_amount: Decimal, status: str) -> bool:
     """В KPI продажа встаёт один раз, когда накопленная оплата дошла до 25%."""
     return manual_sale_counts_in_kpi(service_amount, paid_amount, status)
+
+
+async def _mark_lead_won_after_kpi_sale(
+    db: AsyncSession,
+    *,
+    company_id: int,
+    lead_id: int,
+    pipeline_id: int,
+    current_user: CurrentUser,
+) -> None:
+    """После оплаты KPI: лид → «Удачно» и stub в чатах (единый счётчик с канбаном)."""
+    lead = await db.get(Lead, lead_id)
+    if lead is None or lead.company_id != company_id:
+        return
+    await db.refresh(lead, ["stage"])
+    cur = (lead.stage.name if lead.stage else "") or ""
+    if cur.strip() == "Удачно":
+        try:
+            from app.routers.chat import _ensure_whatsapp_thread_for_lead
+
+            await _ensure_whatsapp_thread_for_lead(db, company_id=company_id, lead=lead)
+        except Exception:
+            logger.exception("whatsapp stub for already-Удачно lead=%s", lead_id)
+        return
+    won = (
+        await db.execute(
+            select(PipelineStage)
+            .where(
+                PipelineStage.company_id == company_id,
+                PipelineStage.pipeline_id == pipeline_id,
+                PipelineStage.name == "Удачно",
+            )
+            .order_by(PipelineStage.id.asc())
+            .limit(1),
+        )
+    ).scalars().first()
+    if won is None:
+        return
+    before = cur
+    lead.status_id = int(won.id)
+    lead.archived_from_stage = None
+    await db.flush()
+    from app.services.audit import write_audit_event
+
+    await write_audit_event(
+        db,
+        entity_type="lead",
+        entity_id=int(lead.id),
+        action="status_changed",
+        current_user=current_user,
+        details=f"Смена стадии: {before} -> Удачно (KPI-продажа)",
+    )
+    try:
+        from app.routers.chat import _ensure_whatsapp_thread_for_lead
+
+        await _ensure_whatsapp_thread_for_lead(db, company_id=company_id, lead=lead)
+    except Exception:
+        logger.exception("whatsapp stub after KPI→Удачно lead=%s", lead_id)
 
 
 def _paid_at_from_input(raw: date | datetime | None, *, fallback: datetime | None = None) -> datetime:
@@ -2169,6 +2230,15 @@ async def create_manual_sale(
         client_name=sale.client_name,
         client_phone=sale.client_phone,
     )
+    # Продажа KPI с карточкой → «Удачно» + stub в чатах (KPI и канбан/чаты не расходятся).
+    if link_lead_id is not None and total_paid > 0:
+        await _mark_lead_won_after_kpi_sale(
+            db,
+            company_id=company_id,
+            lead_id=int(link_lead_id),
+            pipeline_id=int(body.pipeline_id),
+            current_user=current_user,
+        )
     from app.services.course_flow_from_kpi import sync_course_flows_from_kpi
 
     await sync_course_flows_from_kpi(db, company_id=company_id, sale_id=int(sale.id))
