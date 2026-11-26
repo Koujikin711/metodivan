@@ -243,8 +243,8 @@ export function LeadDetailPage() {
       if (vars.stageName.trim() === "Удачно") {
         const href = afterWonHref(leadId, meQuery.data);
         toast.success(
-          href.startsWith("/sales")
-            ? "Открываем окно продаж"
+          href.startsWith("/kpi")
+            ? "Открываем «Добавить продажу»"
             : "Открываем онлайн-запись — выберите эксперта, дату и сумму",
         );
         navigate(href);

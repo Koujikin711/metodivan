@@ -1310,8 +1310,8 @@ export function ChatPage() {
       if (salesChatMode && stageName.trim() === "Удачно") {
         const href = afterWonHref(data.id, meQuery.data);
         toast.success(
-          href.startsWith("/sales")
-            ? "Открываем окно продаж"
+          href.startsWith("/kpi")
+            ? "Открываем «Добавить продажу»"
             : "Открываем онлайн-запись — выберите эксперта, дату и сумму",
         );
         navigate(href);

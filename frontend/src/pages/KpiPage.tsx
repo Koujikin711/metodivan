@@ -799,9 +799,9 @@ export function KpiPage() {
     setSaleForm((s) => (s.manager_user_id === id ? s : { ...s, manager_user_id: id }));
   }, [isManager, meQuery.data?.id]);
 
-  // Phase 8B: create-from-Lead — ?lead_id= → auto-select, open manual tab
+  // Phase 8B / Удачно: ?lead_id= → open «Добавить продажу» prefilled (ФИО, телефон)
   useEffect(() => {
-    if (!isAdminOrOwner && !isManager) return;
+    if (!kpiOps) return;
     const raw = searchParams.get("lead_id");
     if (!raw) return;
     const lid = Number(raw);
@@ -811,20 +811,25 @@ export function KpiPage() {
       try {
         const lead = await apiFetch<Lead>(`/api/leads/${lid}`);
         if (cancelled) return;
+        const phone = (lead.phone_display || lead.phone || "").trim();
         setSelectedLead({
           lead_id: lead.id,
           name: lead.name,
-          phone: lead.phone ?? null,
+          phone: phone || lead.phone || null,
         });
         setLeadFromContext(true);
         setSaleForm((s) => ({
           ...s,
-          client_name: lead.name || s.client_name,
-          client_phone: (lead.phone || "").trim() || s.client_phone,
+          client_name: (lead.name || "").trim() || s.client_name,
+          client_phone: phone || s.client_phone,
         }));
+        if (lead.pipeline_id != null) setPipelineId(lead.pipeline_id);
         setTab("manual");
+        setSaleFormOpen(true);
+        toast.success(`Клиент «${(lead.name || "").trim() || `#${lead.id}`}» подставлен — укажите продукт и сумму`);
         const next = new URLSearchParams(searchParams);
         next.delete("lead_id");
+        if (next.get("tab") !== "manual") next.set("tab", "manual");
         setSearchParams(next, { replace: true });
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Lead не найден");
@@ -834,7 +839,7 @@ export function KpiPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot from URL
-  }, [isAdminOrOwner, isManager]);
+  }, [kpiOps]);
 
   const qs = useMemo(() => {
     if (!pipelineId) return "";
