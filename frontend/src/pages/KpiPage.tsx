@@ -5,7 +5,9 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import {
-  takeAfterWonSaleStash,
+  clearAfterWonSaleStash,
+  peekAfterWonSaleStash,
+  shouldOpenSaleFormFromUrl,
   type AfterWonNavState,
 } from "@/lib/afterWonNavigate";
 
@@ -739,8 +741,18 @@ export function KpiPage() {
   const [journalOpen, setJournalOpen] = useState(false);
   const [pendingConfirmOpen, setPendingConfirmOpen] = useState(false);
   const [saleProductFilter, setSaleProductFilter] = useState<"all" | "course" | "protocol">("all");
-  const [saleFormOpen, setSaleFormOpen] = useState(false);
-  const [tab, setTab] = useState<TabId>(isCurator ? "debtors" : "sales");
+  const [saleFormOpen, setSaleFormOpen] = useState(() =>
+    typeof window !== "undefined"
+      ? shouldOpenSaleFormFromUrl(window.location.search) || Boolean(peekAfterWonSaleStash())
+      : false,
+  );
+  const [tab, setTab] = useState<TabId>(() => {
+    if (isCurator) return "debtors";
+    if (typeof window !== "undefined" && shouldOpenSaleFormFromUrl(window.location.search)) {
+      return "manual";
+    }
+    return "sales";
+  });
 
   // CRM-DN: вкладка «Протоколы 30д» убрана.
   useEffect(() => {
@@ -775,7 +787,7 @@ export function KpiPage() {
   const locationWonState = (location.state as AfterWonNavState | null)?.openSaleForm
     ? (location.state as AfterWonNavState)
     : null;
-  const [stashedWonState] = useState<AfterWonNavState | null>(() => takeAfterWonSaleStash());
+  const [stashedWonState] = useState<AfterWonNavState | null>(() => peekAfterWonSaleStash());
   const wonNavState = locationWonState ?? stashedWonState;
   const leadIdParam = searchParams.get("lead_id");
   const saleFormParam = searchParams.get("sale_form");
@@ -851,14 +863,14 @@ export function KpiPage() {
     });
   }, [kpiOps, saleFormParam, leadIdParam, wonNavState]);
 
-  // Prefill из API по lead_id (URL или navigate state) + убрать служебные query
+  // Prefill из API; оставляем sale_form=1 в URL (чтобы remount снова открыл форму)
   useEffect(() => {
     if (!kpiOps) return;
     const raw = leadIdParam || (wonNavState?.leadId != null ? String(wonNavState.leadId) : null);
     if (!raw) return;
     const lid = Number(raw);
     if (!Number.isFinite(lid) || lid < 1) return;
-    if (consumedWonLeadRef.current === lid && !leadIdParam && !saleFormParam) return;
+    if (consumedWonLeadRef.current === lid) return;
 
     let cancelled = false;
     void (async () => {
@@ -886,11 +898,15 @@ export function KpiPage() {
           `Клиент «${name || `#${lead.id}`}» подставлен — укажите продукт, стоимость и оплату`,
         );
 
+        // Keep sale_form=1; drop lead_id only to avoid repeat toasts on remount
         const next = new URLSearchParams(searchParams);
         next.delete("lead_id");
-        next.delete("sale_form");
+        next.set("sale_form", "1");
         next.set("tab", "manual");
-        navigate(`${location.pathname}?${next.toString()}`, { replace: true, state: null });
+        navigate(`${location.pathname}?${next.toString()}`, {
+          replace: true,
+          state: locationWonState ?? null,
+        });
         requestAnimationFrame(() => {
           saleFormAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         });
@@ -1174,6 +1190,13 @@ export function KpiPage() {
       });
       setSelectedLead(null);
       setLeadFromContext(false);
+      clearAfterWonSaleStash();
+      if (saleFormParam === "1" || leadIdParam) {
+        const next = new URLSearchParams(searchParams);
+        next.delete("sale_form");
+        next.delete("lead_id");
+        navigate(`${location.pathname}?${next.toString()}`, { replace: true, state: null });
+      }
       void queryClient.invalidateQueries({ queryKey: ["sales-kpi-manual-sales"] });
       void queryClient.invalidateQueries({ queryKey: ["sales-kpi-sales-report"] });
       void queryClient.invalidateQueries({ queryKey: ["sales-kpi-debtors"] });
@@ -1920,7 +1943,19 @@ export function KpiPage() {
               <button
                 type="button"
                 className="btn-secondary min-h-12 w-full text-base sm:min-h-0 sm:w-auto sm:text-sm"
-                onClick={() => setSaleFormOpen(false)}
+                onClick={() => {
+                  setSaleFormOpen(false);
+                  clearAfterWonSaleStash();
+                  if (saleFormParam === "1" || leadIdParam) {
+                    const next = new URLSearchParams(searchParams);
+                    next.delete("sale_form");
+                    next.delete("lead_id");
+                    navigate(`${location.pathname}?${next.toString()}`, {
+                      replace: true,
+                      state: null,
+                    });
+                  }
+                }}
               >
                 Скрыть
               </button>
