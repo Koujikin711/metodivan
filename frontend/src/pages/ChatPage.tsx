@@ -1043,7 +1043,8 @@ export function ChatPage() {
     queryKey: ["chat-messages", threadId],
     queryFn: () =>
       apiFetch<ChatMessage[]>(`/api/chat/threads/${threadId}/messages?limit=50&offset=0`, {
-        timeoutMs: 18_000,
+        /* Бэкенд режет Green backfill ~3с; 10с — запас на сеть, без вечной «Загрузка…». */
+        timeoutMs: 10_000,
       }),
     enabled: !!threadId,
     staleTime: 4_000,
@@ -1310,9 +1311,13 @@ export function ChatPage() {
       if (salesChatMode && stageName.trim() === "Удачно") {
         const href = afterWonHref(data.id, meQuery.data);
         const navState = afterWonNavState(data);
-        stashAfterWonSale(navState);
-        toast.success("Открываем «Добавить продажу»");
-        navigate(href, { state: navState });
+        if (href.startsWith("/kpi")) stashAfterWonSale(navState);
+        toast.success(
+          href.startsWith("/kpi")
+            ? "Открываем «Добавить продажу»"
+            : "Открываем онлайн-запись — специалист необязателен",
+        );
+        navigate(href, { state: href.startsWith("/kpi") ? navState : undefined });
       }
     },
     onError: (e: Error) => toast.error(e.message),

@@ -1951,6 +1951,24 @@ async def ensure_booking_referrer(conn: AsyncConnection, database_url: str) -> N
         )
 
 
+async def ensure_booking_appointment_specialist_nullable(
+    conn: AsyncConnection,
+    database_url: str,
+) -> None:
+    """Запись без эксперта (после «Удачно»): specialist_id может быть NULL."""
+    low = database_url.lower()
+    if "sqlite" in low:
+        # SQLite не умеет DROP NOT NULL без пересборки таблицы — новые INSERT с NULL
+        # проходят, если колонка уже без NOT NULL; иначе CREATE TABLE при create_all
+        # для пустых БД уже nullable в модели. Для старых SQLite оставляем как есть.
+        return
+    if "postgresql" not in low and "asyncpg" not in low:
+        return
+    await conn.execute(
+        text("ALTER TABLE booking_appointments ALTER COLUMN specialist_id DROP NOT NULL"),
+    )
+
+
 async def ensure_user_also_curator(conn: AsyncConnection, database_url: str) -> None:
     """Эксперт может дополнительно быть куратором на той же учётке."""
     low = database_url.lower()

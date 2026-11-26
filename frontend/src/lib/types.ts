@@ -657,7 +657,7 @@ export interface BookingSpecialist {
 export interface BookingAppointment {
   id: number;
   lead_id: number | null;
-  specialist_id: number;
+  specialist_id: number | null;
   direction_id: number;
   patient_name: string;
   patient_phone: string;

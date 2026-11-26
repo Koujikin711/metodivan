@@ -46,6 +46,7 @@ async def fetch_chat_history(
     *,
     chat_id: str,
     count: int = 100,
+    timeout: float = 60.0,
 ) -> tuple[list[dict[str, Any]], str | None]:
     instance_id, api_token, base = _green_credentials(config)
     if not instance_id or not api_token:
@@ -53,7 +54,8 @@ async def fetch_chat_history(
     url = f"{base}/waInstance{instance_id}/getChatHistory/{api_token}"
     body = {"chatId": chat_id, "count": max(1, min(int(count), 500))}
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        # При открытии чата (offset=0) таймаут короткий — иначе UI висит на «Загрузка сообщений…».
+        async with httpx.AsyncClient(timeout=max(1.0, float(timeout))) as client:
             r = await client.post(url, json=body)
             if r.status_code >= 400:
                 return [], f"GREEN API HTTP {r.status_code}: {(r.text or '')[:300]}"

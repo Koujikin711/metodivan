@@ -365,7 +365,7 @@ async def _assert_expert_readonly_for_booking(db: AsyncSession, current_user: Us
 
 
 def _appointment_duration_minutes(
-    specialist: BookingSpecialist,
+    specialist: BookingSpecialist | None,
     direction: BookingDirection | None = None,
     *,
     override_min: int | None = None,
@@ -383,17 +383,20 @@ def _appointment_duration_minutes(
             return dir_slot
     if fallback_min is not None and int(fallback_min) >= 10:
         return int(fallback_min)
-    spec_slot = int(specialist.slot_duration_min or 0)
-    return spec_slot if spec_slot >= 10 else 30
+    if specialist is not None:
+        spec_slot = int(specialist.slot_duration_min or 0)
+        if spec_slot >= 10:
+            return spec_slot
+    return 30
 
 
-def _visit_group_key(phone: str | None, specialist_id: int) -> tuple[str, int]:
+def _visit_group_key(phone: str | None, specialist_id: int | None) -> tuple[str, int]:
     digits = _norm_phone(phone) or ""
     if len(digits) >= 9:
         digits = digits[-9:]
     elif not digits:
         digits = (phone or "").strip().lower()
-    return (digits, int(specialist_id))
+    return (digits, int(specialist_id or 0))
 
 
 async def _visit_labels_for_ids(
@@ -602,9 +605,14 @@ def _specialist_read(
     )
 
 
-def _course_streams_enabled_for_booking(specialist: BookingSpecialist, direction: BookingDirection) -> bool:
+def _course_streams_enabled_for_booking(
+    specialist: BookingSpecialist | None,
+    direction: BookingDirection,
+) -> bool:
     if bool(getattr(direction, "course_streams_enabled", False)):
         return True
+    if specialist is None:
+        return False
     return bool(getattr(specialist, "course_streams_enabled", False))
 
 
@@ -1811,7 +1819,7 @@ async def list_appointments(
             BookingSpecialist.full_name,
         )
         .join(BookingDirection, BookingAppointment.direction_id == BookingDirection.id)
-        .join(BookingSpecialist, BookingAppointment.specialist_id == BookingSpecialist.id)
+        .outerjoin(BookingSpecialist, BookingAppointment.specialist_id == BookingSpecialist.id)
         .where(BookingAppointment.company_id == company_id)
     )
     if lead_id is not None:
@@ -1898,7 +1906,7 @@ async def booking_patient_history(
                 BookingSpecialist.crm_user_id,
             )
             .select_from(BookingAppointment)
-            .join(BookingSpecialist, BookingAppointment.specialist_id == BookingSpecialist.id)
+            .outerjoin(BookingSpecialist, BookingAppointment.specialist_id == BookingSpecialist.id)
             .where(
                 BookingAppointment.company_id == company_id,
                 or_(*match_conds),
@@ -2268,13 +2276,16 @@ async def create_appointment(
 ) -> BookingAppointmentRead:
     await _assert_expert_readonly_for_booking(db, current_user)
     await ensure_active_expert_booking_profiles(db, company_id)
-    specialist = await db.get(BookingSpecialist, body.specialist_id)
-    if specialist is None or specialist.company_id != company_id or not specialist.is_active:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Специалист не найден")
-    await _assert_expert_specialist_access(db, current_user, specialist)
-    allowed_direction_ids = await get_specialist_direction_ids(db, specialist.id)
-    if not allowed_direction_ids:
-        allowed_direction_ids = [int(specialist.direction_id)]
+    specialist: BookingSpecialist | None = None
+    allowed_direction_ids: list[int] = []
+    if body.specialist_id is not None:
+        specialist = await db.get(BookingSpecialist, body.specialist_id)
+        if specialist is None or specialist.company_id != company_id or not specialist.is_active:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Специалист не найден")
+        await _assert_expert_specialist_access(db, current_user, specialist)
+        allowed_direction_ids = await get_specialist_direction_ids(db, specialist.id)
+        if not allowed_direction_ids:
+            allowed_direction_ids = [int(specialist.direction_id)]
 
     service_title_raw = (body.service_title or "").strip()
     resolved_direction_id: int | None = None
@@ -2289,9 +2300,14 @@ async def create_appointment(
         )
         if by_title is not None:
             resolved_direction_id = int(by_title.id)
-    # 3) Fallback — основное направление специалиста.
-    if resolved_direction_id is None:
+    # 3) Fallback — основное направление специалиста (если выбран).
+    if resolved_direction_id is None and specialist is not None:
         resolved_direction_id = int(specialist.direction_id)
+    if resolved_direction_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Выберите услугу (направление записи)",
+        )
 
     direction = await db.get(BookingDirection, resolved_direction_id)
     if direction is None or direction.company_id != company_id:
@@ -2312,7 +2328,7 @@ async def create_appointment(
 
     # Админ может записать на пакет даже если направление ещё не в списке специалиста —
     # привязываем, чтобы direction_id сохранился корректно.
-    if int(resolved_direction_id) not in allowed_direction_ids:
+    if specialist is not None and int(resolved_direction_id) not in allowed_direction_ids:
         if _can_book_admin_package(current_user.role) and course_like:
             new_ids = list(dict.fromkeys([*allowed_direction_ids, int(resolved_direction_id)]))
             await set_specialist_directions(
@@ -2338,8 +2354,9 @@ async def create_appointment(
     # Сеансы (массаж/логопед): каждый день = отдельная оплата.
     # Без сеансов: пакет — стоимость один раз, доплаты суммируются в первую запись.
     start_times = [_add_booking_calendar_days(start_at, offset) for offset in range(consecutive_days)]
-    for slot_start in start_times:
-        await _assert_slot_available(db, specialist, body.specialist_id, slot_start)
+    if specialist is not None and body.specialist_id is not None:
+        for slot_start in start_times:
+            await _assert_slot_available(db, specialist, body.specialist_id, slot_start)
     if (
         current_user.role == UserRole.manager
         and float(body.paid_amount or 0) > 0
@@ -3512,7 +3529,7 @@ async def upcoming_services_report(
             BookingAppointment.status,
         )
         .join(BookingDirection, BookingDirection.id == BookingAppointment.direction_id)
-        .join(BookingSpecialist, BookingSpecialist.id == BookingAppointment.specialist_id)
+        .outerjoin(BookingSpecialist, BookingSpecialist.id == BookingAppointment.specialist_id)
         .where(
             BookingAppointment.company_id == company_id,
             BookingAppointment.start_at >= win_start,
@@ -3627,7 +3644,7 @@ async def upcoming_services_drilldown(
             BookingSpecialist.full_name,
         )
         .join(BookingDirection, BookingDirection.id == BookingAppointment.direction_id)
-        .join(BookingSpecialist, BookingSpecialist.id == BookingAppointment.specialist_id)
+        .outerjoin(BookingSpecialist, BookingSpecialist.id == BookingAppointment.specialist_id)
         .where(
             BookingAppointment.company_id == company_id,
             BookingAppointment.start_at >= range_start,
@@ -3710,7 +3727,7 @@ async def upcoming_services_drilldown(
                 lead_id=int(a.lead_id) if a.lead_id is not None else None,
                 direction_id=int(a.direction_id),
                 direction_name=str(dname or ""),
-                specialist_id=int(a.specialist_id),
+                specialist_id=int(a.specialist_id) if a.specialist_id is not None else None,
                 specialist_name=str(sname or "") if sname else None,
                 responsible_manager_id=mid,
                 manager_name=name_map.get(mid) if mid else None,

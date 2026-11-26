@@ -154,7 +154,7 @@ class SpecialistReorderBody(BaseModel):
 class BookingAppointmentRead(BaseModel):
     id: int
     lead_id: int | None
-    specialist_id: int
+    specialist_id: int | None = None
     direction_id: int
     patient_name: str
     patient_phone: str
@@ -215,7 +215,11 @@ class BookingAppointmentCreate(BaseModel):
         ge=1,
         description="Направление записи; должно входить в направления специалиста",
     )
-    specialist_id: int = Field(..., ge=1)
+    specialist_id: int | None = Field(
+        default=None,
+        ge=1,
+        description="Эксперт необязателен — можно создать запись только с услугой/датой",
+    )
     start_at: datetime
     service_title: str = Field(..., min_length=1, max_length=500)
     service_amount: float = Field(..., ge=0)

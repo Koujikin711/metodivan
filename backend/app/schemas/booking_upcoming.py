@@ -73,7 +73,7 @@ class UpcomingServicesDrillRow(BaseModel):
     lead_id: int | None = None
     direction_id: int
     direction_name: str
-    specialist_id: int
+    specialist_id: int | None = None
     specialist_name: str | None = None
     responsible_manager_id: int | None = None
     manager_name: str | None = None

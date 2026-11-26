@@ -70,6 +70,7 @@ from app.database_migrate import (
     ensure_task_status_missed,
     ensure_user_pay_profile,
     ensure_booking_referrer,
+    ensure_booking_appointment_specialist_nullable,
     ensure_payroll_adjustments,
     ensure_employee_name_terms,
     ensure_payroll_sheet_hides,
@@ -206,6 +207,7 @@ async def _run_startup_migrations_with_retry() -> None:
                 await ensure_task_repeat_dates(conn, db_url)
                 await ensure_task_repeat_until(conn, db_url)
                 await ensure_booking_referrer(conn, db_url)
+                await ensure_booking_appointment_specialist_nullable(conn, db_url)
                 await ensure_payroll_adjustments(conn, db_url)
                 await ensure_employee_name_terms(conn, db_url)
                 await ensure_payroll_sheet_hides(conn, db_url)
@@ -702,6 +704,7 @@ async def _run_startup_db_and_seed() -> None:
             ensure_task_repeat_dates,
             ensure_task_repeat_until,
             ensure_booking_referrer,
+            ensure_booking_appointment_specialist_nullable,
             ensure_lead_clinical_diagnosis,
             ensure_lead_patient_birth_date,
             ensure_payroll_adjustments,

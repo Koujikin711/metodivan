@@ -1,13 +1,17 @@
 /**
- * После «Удачно» всегда KPI «Добавить продажу» (Пакеты / услуги).
- * CRM-DN clinic тоже: booking_enabled=true, но нужная форма — продажа, не онлайн-запись.
+ * После «Удачно»:
+ * - clinic / booking_enabled → онлайн-запись (специалист необязателен)
+ * - sales / desk → KPI «Добавить продажу»
  */
-export function afterWonPath(_me?: {
+export function afterWonPath(me?: {
   crm_mode?: string | null;
   desk_sales_enabled?: boolean | null;
   booking_enabled?: boolean | null;
-} | null): "/kpi" {
-  return "/kpi";
+} | null): "/kpi" | "/booking" {
+  if (me == null) return "/booking";
+  const salesSpace = me.crm_mode === "sales" || Boolean(me.desk_sales_enabled);
+  if (salesSpace || me.booking_enabled === false) return "/kpi";
+  return "/booking";
 }
 
 export type AfterWonNavState = {
@@ -28,9 +32,11 @@ export function afterWonHref(
     booking_enabled?: boolean | null;
   } | null,
 ): string {
-  void me;
-  // sale_form=1 stays until user hides/saves — survives remount
-  return `/kpi?tab=manual&sale_form=1&lead_id=${leadId}`;
+  const path = afterWonPath(me);
+  if (path === "/kpi") {
+    return `/kpi?tab=manual&sale_form=1&lead_id=${leadId}`;
+  }
+  return `/booking?lead_id=${leadId}`;
 }
 
 export function afterWonNavState(lead: {

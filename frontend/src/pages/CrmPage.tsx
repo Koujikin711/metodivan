@@ -37,6 +37,7 @@ import { WaitingCallbackModal } from "@/components/WaitingCallbackModal";
 import { apiDownloadBlob, apiFetch, getStoredToken, resolveApiUrl } from "@/lib/api";
 import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
 import { afterWonHref, afterWonNavState, stashAfterWonSale } from "@/lib/afterWonNavigate";
+import { filterLeadSourcesForUi } from "@/lib/leadSourcesDisplay";
 import { isRefusalStageName, leadStageChips } from "@/lib/leadStageChips";
 import { formatCompactCount } from "@/lib/money";
 import { theme } from "@/lib/theme";
@@ -59,20 +60,6 @@ import type {
 
 /** Основные источники CRM-DN — всегда сверху в создании лида. */
 const CRM_DN_SOURCE_DEFAULTS = ["Инстаграм", "Фейсбук", "Вотсап"] as const;
-
-/** Латинские дубли + INSTAGRAM MC/DM — не показываем (оставляем кириллицу). */
-const CRM_DN_SOURCE_HIDDEN = new Set(
-  [
-    "INSTAGRAM",
-    "INSTAGRAM_DM",
-    "INSTAGRAM MC",
-    "Instagram",
-    "WHATSAPP",
-    "WhatsApp",
-    "TELEGRAM",
-    "Telegram",
-  ].map((n) => n.trim().toLowerCase()),
-);
 
 /** На карточках канбана показываем единые кириллические ярлыки. */
 function formatLeadSourceLabel(raw: string): string {
@@ -941,9 +928,7 @@ export function CrmPage() {
   });
 
   const createLeadSourceOptions = useMemo(() => {
-    const fromApi = (sourcesQuery.data ?? []).filter(
-      (s) => s.is_active && !CRM_DN_SOURCE_HIDDEN.has((s.name || "").trim().toLowerCase()),
-    );
+    const fromApi = filterLeadSourcesForUi(sourcesQuery.data ?? []).filter((s) => s.is_active);
     const names = new Set(fromApi.map((s) => s.name));
     const pinned: LeadSource[] = CRM_DN_SOURCE_DEFAULTS.filter((name) => !names.has(name)).map(
       (name, i) => ({ id: -1000 - i, name, is_active: true }),
@@ -1858,8 +1843,8 @@ export function CrmPage() {
             phone_display: lead.phone_display,
             pipeline_id: lead.pipeline_id,
           });
-          stashAfterWonSale(navState);
-          navigate(href, { state: navState });
+          if (href.startsWith("/kpi")) stashAfterWonSale(navState);
+          navigate(href, { state: href.startsWith("/kpi") ? navState : undefined });
         }
       } catch (e) {
         setLeads(previous);

@@ -258,8 +258,13 @@ export function LeadDetailPage() {
               }
             : { id: leadId });
         const navState = afterWonNavState(leadSnap);
-        stashAfterWonSale(navState);
-        navigate(href, { state: navState });
+        if (href.startsWith("/kpi")) stashAfterWonSale(navState);
+        toast.success(
+          href.startsWith("/kpi")
+            ? "Открываем «Добавить продажу»"
+            : "Открываем онлайн-запись — специалист необязателен",
+        );
+        navigate(href, { state: href.startsWith("/kpi") ? navState : undefined });
       }
     },
     onError: (e: Error) => toast.error(e.message || "Не удалось сменить стадию"),

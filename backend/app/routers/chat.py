@@ -1536,10 +1536,18 @@ async def list_messages(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
     await _assert_thread_access(db, thread, current_user)
     if offset == 0:
+        import asyncio
+
         from app.services.green_api_backfill import import_phone_messages_for_thread
 
         try:
-            await import_phone_messages_for_thread(db, company_id=company_id, thread=thread)
+            # Не блокируем выдачу сообщений из БД, если Green API тормозит.
+            await asyncio.wait_for(
+                import_phone_messages_for_thread(db, company_id=company_id, thread=thread),
+                timeout=3.0,
+            )
+        except TimeoutError:
+            logger.warning("phone journal import timeout thread=%s", thread_id)
         except Exception:
             logger.exception("phone journal import failed thread=%s", thread_id)
     # Последние `limit` сообщений (offset от самых новых), в ответе — по возрастанию времени для UI.

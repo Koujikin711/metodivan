@@ -809,7 +809,11 @@ class BookingAppointment(Base):
     # Дата рождения ребёнка (обязательна при новой записи с формы).
     patient_birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     direction_id: Mapped[int] = mapped_column(ForeignKey("booking_directions.id", ondelete="RESTRICT"))
-    specialist_id: Mapped[int] = mapped_column(ForeignKey("booking_specialists.id", ondelete="RESTRICT"))
+    # Nullable: запись после «Удачно» без выбора эксперта (дата/сумма важнее колонки).
+    specialist_id: Mapped[int | None] = mapped_column(
+        ForeignKey("booking_specialists.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(32), default="booked")

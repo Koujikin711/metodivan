@@ -36,6 +36,7 @@ import {
   isHiddenBookingDirectionName,
 } from "@/lib/bookingDirectionKinds";
 import { formatMoney } from "@/lib/money";
+import { filterLeadSourcesForUi } from "@/lib/leadSourcesDisplay";
 import { isReferralService } from "@/lib/referralService";
 import { visitDisplayValue } from "@/lib/bookingVisitDisplay";
 import { datetimeMinuteStepForSpecialist } from "@/lib/bookingFreeSlots";
@@ -973,7 +974,9 @@ export function OnlineBookingPage() {
 
   const gridAppointmentSpecIds = useMemo(() => {
     const set = new Set<number>();
-    for (const a of gridAppointmentsQuery.data ?? []) set.add(a.specialist_id);
+    for (const a of gridAppointmentsQuery.data ?? []) {
+      if (a.specialist_id != null) set.add(a.specialist_id);
+    }
     return set;
   }, [gridAppointmentsQuery.data]);
 
@@ -1447,6 +1450,10 @@ export function OnlineBookingPage() {
       toast.error("Неверная дата или время");
       return;
     }
+    if (apptDetail.specialist_id == null) {
+      toast.error("Сначала назначьте специалиста — без него перенос недоступен");
+      return;
+    }
     const durationMin = Math.max(10, Number(timeEditDurationMin) || 30);
     moveAppointmentMutation.mutate(
       {
@@ -1480,8 +1487,8 @@ export function OnlineBookingPage() {
       toast.error("Эксперт может только просматривать свои записи");
       return;
     }
-    if (!specialistId || !startAt || !serviceTitle.trim()) {
-      toast.error("Укажите услугу, специалиста, дату и время.");
+    if (!startAt || !serviceTitle.trim()) {
+      toast.error("Укажите услугу, дату и время.");
       return;
     }
     if (!patientName.trim()) {
@@ -1505,10 +1512,7 @@ export function OnlineBookingPage() {
       toast.error("Укажите телефон пациента");
       return;
     }
-    if (!specialistsActive.length) {
-      toast.error("Нет специалистов в сетке — добавьте специалиста в расписании.");
-      return;
-    }
+    // Специалист необязателен (после «Удачно» можно записать без эксперта).
     let startIso: string;
     try {
       startIso = datetimeLocalBookingToIsoUtc(startAt);
@@ -1573,7 +1577,7 @@ export function OnlineBookingPage() {
       patient_phone: resolvedPhone,
       patient_birth_date: patientBirthDate.trim() || null,
       extra_phones: extraPhones.map((p) => p.trim()).filter(Boolean),
-      specialist_id: specialistId,
+      ...(specialistId ? { specialist_id: specialistId } : { specialist_id: null }),
       service_title: serviceTitle.trim(),
       direction_id: serviceDirectionId,
       start_at: startIso,
@@ -1655,7 +1659,7 @@ export function OnlineBookingPage() {
             </div>
             {chatStages && leadId ? (
               <p className="booking-page-note">
-                Статус «Удачно»: заполните эксперта, дату и сумму — лид уже выбран (#{leadId}
+                Статус «Удачно»: укажите дату и сумму — специалист необязателен. Лид уже выбран (#{leadId}
                 {patientName ? `, ${patientName}` : ""}).
               </p>
             ) : null}
@@ -2032,17 +2036,20 @@ export function OnlineBookingPage() {
                   onChange={(userId) => setReferredByUserId(userId ?? "")}
                 />
                 <label className="block text-sm mo-muted">
-                  Специалист
+                  Специалист{" "}
+                  <span className="font-normal normal-case tracking-normal opacity-70">(необязательно)</span>
                   <select
-                    required
                     value={specialistId || ""}
                     onChange={(e) => {
-                      const id = Number(e.target.value);
+                      const id = Number(e.target.value) || 0;
                       setSpecialistId(id);
-                      setBookingDurationMin(resolveBookingDurationMin({ specialistId: id }));
+                      if (id) {
+                        setBookingDurationMin(resolveBookingDurationMin({ specialistId: id }));
+                      }
                     }}
                     className="mt-1 w-full mo-input"
                   >
+                    <option value="">— без специалиста —</option>
                     {specialistsForFormSelect.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.full_name}
@@ -2288,7 +2295,7 @@ export function OnlineBookingPage() {
                 </form>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {(sourcesQuery.data ?? []).map((s) => (
+                {filterLeadSourcesForUi(sourcesQuery.data ?? []).map((s) => (
                   <span
                     key={s.id}
                     className={[
@@ -2303,7 +2310,7 @@ export function OnlineBookingPage() {
                     {!s.is_active ? <span className="ml-1 normal-case opacity-80">· выкл.</span> : null}
                   </span>
                 ))}
-                {!sourcesQuery.isLoading && (sourcesQuery.data ?? []).length === 0 && (
+                {!sourcesQuery.isLoading && filterLeadSourcesForUi(sourcesQuery.data ?? []).length === 0 && (
                   <span className="text-xs mo-muted">Источников пока нет</span>
                 )}
               </div>
@@ -2867,8 +2874,10 @@ export function OnlineBookingPage() {
                     value={timeEditDraft}
                     onChange={setTimeEditDraft}
                     minuteStep={datetimeMinuteStepForSpecialist(
-                      specialistsQuery.data?.find((s) => s.id === apptDetail.specialist_id)
-                        ?.slot_duration_min,
+                      apptDetail.specialist_id != null
+                        ? specialistsQuery.data?.find((s) => s.id === apptDetail.specialist_id)
+                            ?.slot_duration_min
+                        : undefined,
                     )}
                     allowClear={false}
                     aria-label="Новые дата и время записи"
@@ -2882,7 +2891,7 @@ export function OnlineBookingPage() {
                     >
                       {bookingDurationChoices({
                         directionId: apptDetail.direction_id,
-                        specialistId: apptDetail.specialist_id,
+                        specialistId: apptDetail.specialist_id ?? undefined,
                       }).map((n) => (
                         <option key={n} value={n}>
                           {n === 60 ? "1 час" : n === 90 ? "1.5 часа" : n === 120 ? "2 часа" : `${n} мин`}
