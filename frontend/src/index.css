@@ -235,9 +235,10 @@
 
   .chat-thread-header-actions .chat-thread-header-btn {
     width: auto;
-    min-height: 1.5rem;
-    padding: 0.25rem 0.4rem;
-    font-size: 0.65rem;
+    min-height: 2.25rem;
+    padding: 0.4rem 0.65rem;
+    font-size: 0.75rem;
+    touch-action: manipulation;
   }
 
   .chat-thread-header .chat-thread-meta {

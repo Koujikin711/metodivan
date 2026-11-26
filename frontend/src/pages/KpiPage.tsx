@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import { AccessDenied } from "@/components/AccessDenied";
+import { RefusalReasonModal } from "@/components/RefusalReasonModal";
 import { DebtorPatientCard } from "@/components/DebtorPatientCard";
 import { DateField } from "@/components/DateField";
 import { KpiLeadPicker, type KpiLeadPick } from "@/components/KpiLeadPicker";
@@ -1345,14 +1346,13 @@ export function KpiPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const [saleStatusModal, setSaleStatusModal] = useState<null | {
+    id: number;
+    status: "refused" | "completed";
+  }>(null);
+
   function askCloseSale(id: number, status: "refused" | "completed") {
-    const label = status === "refused" ? "отказ" : "завершён";
-    const reason = window.prompt(`Причина статуса «${label}» (обязательно):`)?.trim() ?? "";
-    if (!reason) {
-      toast.error("Укажите причину");
-      return;
-    }
-    closeSaleMutation.mutate({ id, status, reason });
+    setSaleStatusModal({ id, status });
   }
 
   if (role === "expert" || role === "finance_analyst" || role === "administrator") {
@@ -2860,6 +2860,32 @@ export function KpiPage() {
         <p className="text-sm text-red-300">{(planQuery.error as Error).message}</p>
       ) : null}
       {patientCard ? <DebtorPatientCard row={patientCard} onClose={() => setPatientCard(null)} /> : null}
+      {saleStatusModal != null ? (
+        <RefusalReasonModal
+          open
+          title={
+            saleStatusModal.status === "refused"
+              ? "Причина отказа"
+              : "Причина завершения"
+          }
+          hint="Обязательный комментарий к смене статуса продажи."
+          confirmLabel={saleStatusModal.status === "refused" ? "Отказ" : "Завершить"}
+          busy={closeSaleMutation.isPending}
+          onClose={() => {
+            if (!closeSaleMutation.isPending) setSaleStatusModal(null);
+          }}
+          onConfirm={(reason) => {
+            closeSaleMutation.mutate(
+              {
+                id: saleStatusModal.id,
+                status: saleStatusModal.status,
+                reason,
+              },
+              { onSuccess: () => setSaleStatusModal(null) },
+            );
+          }}
+        />
+      ) : null}
     </div>
   );
 }

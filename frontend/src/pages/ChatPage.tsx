@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { AccessDenied } from "@/components/AccessDenied";
 import { PatientPhone, displayPatientPhone } from "@/components/PatientPhone";
 import { ChatMediaVideo } from "@/components/ChatMediaVideo";
+import { RefusalReasonModal } from "@/components/RefusalReasonModal";
 import { WaitingCallbackModal } from "@/components/WaitingCallbackModal";
 import { useChatRealtime } from "@/hooks/useChatRealtime";
 import { useCurrentUserMe } from "@/hooks/useCurrentUserMe";
@@ -600,17 +601,6 @@ const SALES_STAGE_COLORS: Record<SalesStageKey, string> = {
   archive: "#78716c",
 };
 
-function askRefusalReason(): string | null {
-  const reason = window.prompt("Причина отказа");
-  if (reason === null) return null;
-  const trimmed = reason.trim();
-  if (!trimmed) {
-    toast.error("Укажите причину отказа");
-    return null;
-  }
-  return trimmed;
-}
-
 function isWaitingStageName(name: string | null | undefined): boolean {
   const n = (name || "").trim().toLowerCase();
   return n === "в ожидании" || (n.includes("ожид") && !n.includes("ответа"));
@@ -746,6 +736,11 @@ export function ChatPage() {
   const [chatMonth, setChatMonth] = useState(currentYearMonth);
   const [statusOpen, setStatusOpen] = useState(false);
   const [waitingModalLeadId, setWaitingModalLeadId] = useState<number | null>(null);
+  const [refusalModal, setRefusalModal] = useState<{
+    leadId: number;
+    statusId: number;
+    stageName: string;
+  } | null>(null);
 
   useChatRealtime(
     userRole === "manager" ||
@@ -954,8 +949,8 @@ export function ChatPage() {
       const visibleH = vv.height;
       const offsetTop = vv.offsetTop || 0;
       const inset = Math.max(0, layoutH - visibleH - offsetTop);
-      /* Порог: игнорируем мелкий jitter; на iOS клавиатура обычно > 120px */
-      const px = inset < 80 ? 0 : Math.round(inset);
+      /* Порог: игнорируем мелкий jitter; на iOS/Android клавиатура обычно заметно больше */
+      const px = inset < 48 ? 0 : Math.round(inset);
       document.documentElement.style.setProperty("--chat-keyboard-inset", `${px}px`);
     };
     vv.addEventListener("resize", sync);
@@ -1904,21 +1899,23 @@ export function ChatPage() {
                                 setWaitingModalLeadId(leadId);
                                 return;
                               }
-                              let refusalReason: string | undefined;
                               if (isRefusalStageName(s.name)) {
-                                const reason = askRefusalReason();
-                                if (!reason) return;
-                                refusalReason = reason;
+                                setStatusOpen(false);
+                                setRefusalModal({
+                                  leadId,
+                                  statusId: s.id,
+                                  stageName: s.name,
+                                });
+                                return;
                               }
                               setLeadStatusMutation.mutate({
                                 leadId,
                                 statusId: s.id,
                                 stageName: s.name,
-                                refusalReason,
                               });
                             }}
                             className={[
-                              "rounded-lg border px-2.5 py-1.5 text-xs transition",
+                              "min-h-10 rounded-lg border px-3 py-2 text-sm transition sm:min-h-0 sm:px-2.5 sm:py-1.5 sm:text-xs",
                               current
                                 ? "border-[var(--mo-accent)] bg-[var(--mo-accent-soft)] font-semibold text-[var(--mo-text)]"
                                 : "border-[var(--mo-border)] text-[var(--mo-text)] hover:bg-[var(--mo-accent-soft)] disabled:opacity-50",
@@ -2279,6 +2276,28 @@ export function ChatPage() {
             void qc.invalidateQueries({ queryKey: ["chat-thread-bucket-counts"] });
             void qc.invalidateQueries({ queryKey: ["leads"] });
             void qc.invalidateQueries({ queryKey: ["tasks"] });
+          }}
+        />
+      ) : null}
+      {refusalModal != null ? (
+        <RefusalReasonModal
+          open
+          busy={setLeadStatusMutation.isPending}
+          onClose={() => {
+            if (!setLeadStatusMutation.isPending) setRefusalModal(null);
+          }}
+          onConfirm={(reason) => {
+            setLeadStatusMutation.mutate(
+              {
+                leadId: refusalModal.leadId,
+                statusId: refusalModal.statusId,
+                stageName: refusalModal.stageName,
+                refusalReason: reason,
+              },
+              {
+                onSuccess: () => setRefusalModal(null),
+              },
+            );
           }}
         />
       ) : null}

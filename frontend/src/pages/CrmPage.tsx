@@ -32,6 +32,7 @@ import { CrmToolbar } from "@/components/crm/CrmToolbar";
 import { MessageCircle, Phone, Trash2 } from "@/components/icons";
 import { PatientPhone } from "@/components/PatientPhone";
 import { QueryErrorNotice } from "@/components/QueryErrorNotice";
+import { RefusalReasonModal } from "@/components/RefusalReasonModal";
 import { WaitingCallbackModal } from "@/components/WaitingCallbackModal";
 import { apiDownloadBlob, apiFetch, getStoredToken, resolveApiUrl } from "@/lib/api";
 import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
@@ -327,6 +328,9 @@ function LeadCard({
 
   const [protocolUploading, setProtocolUploading] = useState(false);
   const [protocolFile, setProtocolFile] = useState<File | null>(null);
+  const [noShowChoiceOpen, setNoShowChoiceOpen] = useState(false);
+  const [cardRefusal, setCardRefusal] = useState<null | "no-show" | "service-reject">(null);
+  const [cardActionBusy, setCardActionBusy] = useState(false);
 
   useEffect(() => {
     setProtocolFile(null);
@@ -347,36 +351,38 @@ function LeadCard({
     }
   }
 
-  async function handleNoShow() {
+  async function submitNoShowReschedule() {
+    setCardActionBusy(true);
     try {
-      const mode = window.prompt(
-        "Введите: 'перенести' для переноса или 'отказать' для отказа",
-        "перенести",
-      );
-      if (mode == null) return;
-      const action = mode.trim().toLowerCase().includes("отказ") ? "refuse" : "reschedule";
-      if (action === "reschedule") {
-        await apiFetch(`/api/leads/${lead.id}/no-show`, {
-          method: "POST",
-          body: JSON.stringify({ action }),
-        });
-        await refreshAfterMutation();
-        toast.success("Запись перенесена (квалифицирован)");
-        return;
-      }
-      const reason = window.prompt("Причина отказа (обязательно)");
-      if (!reason || !reason.trim()) {
-        toast.error("Причина обязательна");
-        return;
-      }
       await apiFetch(`/api/leads/${lead.id}/no-show`, {
         method: "POST",
-        body: JSON.stringify({ action, reason: reason.trim() }),
+        body: JSON.stringify({ action: "reschedule" }),
       });
+      setNoShowChoiceOpen(false);
+      await refreshAfterMutation();
+      toast.success("Запись перенесена (квалифицирован)");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Не удалось оформить неявку");
+    } finally {
+      setCardActionBusy(false);
+    }
+  }
+
+  async function submitNoShowRefuse(reason: string) {
+    setCardActionBusy(true);
+    try {
+      await apiFetch(`/api/leads/${lead.id}/no-show`, {
+        method: "POST",
+        body: JSON.stringify({ action: "refuse", reason }),
+      });
+      setCardRefusal(null);
+      setNoShowChoiceOpen(false);
       await refreshAfterMutation();
       toast.success("Отказ оформлен");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Не удалось оформить неявку");
+    } finally {
+      setCardActionBusy(false);
     }
   }
 
@@ -390,21 +396,20 @@ function LeadCard({
     }
   }
 
-  async function handleServiceReject() {
+  async function submitServiceReject(reason: string) {
+    setCardActionBusy(true);
     try {
-      const reason = window.prompt("Причина отказа (обязательно)");
-      if (!reason || !reason.trim()) {
-        toast.error("Причина обязательна");
-        return;
-      }
       await apiFetch(`/api/leads/${lead.id}/service-reject`, {
         method: "POST",
-        body: JSON.stringify({ reason: reason.trim() }),
+        body: JSON.stringify({ reason }),
       });
+      setCardRefusal(null);
       await refreshAfterMutation();
       toast.success("Отказ оформлен");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Не удалось оформить отказ");
+    } finally {
+      setCardActionBusy(false);
     }
   }
 
@@ -530,7 +535,7 @@ function LeadCard({
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => void handleNoShow()}
+            onClick={() => setNoShowChoiceOpen(true)}
             className={`${theme.btnSecondary} py-2`}
           >
             Неявка
@@ -552,7 +557,7 @@ function LeadCard({
             <button
               type="button"
               onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => void handleServiceReject()}
+              onClick={() => setCardRefusal("service-reject")}
               className={`${theme.btnDanger} py-2`}
             >
               Нет
@@ -660,6 +665,69 @@ function LeadCard({
           </button>
         </div>
       )}
+
+      {noShowChoiceOpen ? (
+        <div
+          className="fixed inset-0 z-[90] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !cardActionBusy) setNoShowChoiceOpen(false);
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-t-2xl border border-[var(--mo-border)] bg-[var(--mo-surface-elevated)] p-4 shadow-2xl sm:rounded-2xl"
+            role="dialog"
+            aria-modal
+            aria-label="Неявка"
+          >
+            <h3 className="text-base font-semibold text-[var(--mo-text)]">Неявка клиента</h3>
+            <p className="mt-1 text-xs mo-muted">Перенести запись или оформить отказ?</p>
+            <div className="mt-4 flex flex-col gap-2">
+              <button
+                type="button"
+                className="btn-primary min-h-12 w-full text-base"
+                disabled={cardActionBusy}
+                onClick={() => void submitNoShowReschedule()}
+              >
+                Перенести
+              </button>
+              <button
+                type="button"
+                className="min-h-12 w-full rounded-xl bg-[var(--mo-danger)] px-4 text-base font-semibold text-white disabled:opacity-50"
+                disabled={cardActionBusy}
+                onClick={() => {
+                  setNoShowChoiceOpen(false);
+                  setCardRefusal("no-show");
+                }}
+              >
+                Отказ
+              </button>
+              <button
+                type="button"
+                className="btn-secondary min-h-11 w-full"
+                disabled={cardActionBusy}
+                onClick={() => setNoShowChoiceOpen(false)}
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {cardRefusal != null ? (
+        <RefusalReasonModal
+          open
+          busy={cardActionBusy}
+          onClose={() => {
+            if (!cardActionBusy) setCardRefusal(null);
+          }}
+          onConfirm={(reason) => {
+            if (cardRefusal === "no-show") void submitNoShowRefuse(reason);
+            else void submitServiceReject(reason);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1541,6 +1609,13 @@ export function CrmPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
   const [waitingModalLeadId, setWaitingModalLeadId] = useState<number | null>(null);
+  const [refusalPending, setRefusalPending] = useState<null | {
+    mode: "single" | "bulk";
+    leadIds: number[];
+    stageId: number;
+    stageName: string;
+  }>(null);
+  const [refusalBusy, setRefusalBusy] = useState(false);
   const [kanbanError, setKanbanError] = useState<string | null>(null);
   const leadsRef = useRef<Lead[]>([]);
   leadsRef.current = leads;
@@ -1730,15 +1805,14 @@ export function CrmPage() {
         return;
       }
 
-      let refusalReason: string | undefined;
       if (isRefusalStageName(String(stageName || ""))) {
-        const reason = window.prompt("Причина отказа");
-        if (reason === null) return;
-        if (!reason.trim()) {
-          toast.error("Укажите причину отказа");
-          return;
-        }
-        refusalReason = reason.trim();
+        setRefusalPending({
+          mode: "single",
+          leadIds: [leadId],
+          stageId: newStageId,
+          stageName: String(stageName || ""),
+        });
+        return;
       }
 
       const previous = leads;
@@ -1752,7 +1826,6 @@ export function CrmPage() {
           method: "PATCH",
           body: JSON.stringify({
             status_id: newStageId,
-            ...(refusalReason ? { refusal_reason: refusalReason } : {}),
           }),
         });
         void queryClient.invalidateQueries({ queryKey: ["leads"] });
@@ -1815,15 +1888,14 @@ export function CrmPage() {
         setSelectedLeadIds([]);
         return;
       }
-      let refusalReason: string | undefined;
       if (isRefusalStageName(stageName)) {
-        const reason = window.prompt("Причина отказа");
-        if (reason === null) return;
-        if (!reason.trim()) {
-          toast.error("Укажите причину отказа");
-          return;
-        }
-        refusalReason = reason.trim();
+        setRefusalPending({
+          mode: "bulk",
+          leadIds: [...selectedLeadIds],
+          stageId,
+          stageName,
+        });
+        return;
       }
       setBulkBusy(true);
       let ok = 0;
@@ -1834,7 +1906,6 @@ export function CrmPage() {
             method: "PATCH",
             body: JSON.stringify({
               status_id: stageId,
-              ...(refusalReason ? { refusal_reason: refusalReason } : {}),
             }),
           });
           ok += 1;
@@ -3291,6 +3362,67 @@ export function CrmPage() {
             void queryClient.invalidateQueries({ queryKey: ["leads-stage-counts"] });
             void queryClient.invalidateQueries({ queryKey: ["tasks"] });
             void queryClient.invalidateQueries({ queryKey: ["chat-threads"] });
+          }}
+        />
+      ) : null}
+      {refusalPending != null ? (
+        <RefusalReasonModal
+          open
+          busy={refusalBusy}
+          confirmLabel={
+            refusalPending.mode === "bulk" && refusalPending.leadIds.length > 1
+              ? `Отказ · ${refusalPending.leadIds.length}`
+              : "Поставить отказ"
+          }
+          onClose={() => {
+            if (!refusalBusy) setRefusalPending(null);
+          }}
+          onConfirm={(reason) => {
+            void (async () => {
+              setRefusalBusy(true);
+              const { leadIds, stageId, stageName, mode } = refusalPending;
+              let ok = 0;
+              let fail = "";
+              const previous = leads;
+              if (mode === "single" && leadIds.length === 1) {
+                setLeads((cur) =>
+                  cur.map((l) =>
+                    l.id === leadIds[0] ? { ...l, status_id: stageId, stage_name: stageName } : l,
+                  ),
+                );
+              }
+              for (const id of leadIds) {
+                try {
+                  await apiFetch(`/api/leads/${id}/status`, {
+                    method: "PATCH",
+                    body: JSON.stringify({
+                      status_id: stageId,
+                      refusal_reason: reason,
+                    }),
+                  });
+                  ok += 1;
+                } catch (e) {
+                  fail = e instanceof Error ? e.message : "Ошибка";
+                  break;
+                }
+              }
+              setRefusalBusy(false);
+              if (ok === 0) {
+                if (mode === "single") setLeads(previous);
+                setKanbanError(fail || "Не удалось обновить этап");
+                toast.error(fail || "Не удалось поставить отказ");
+                return;
+              }
+              setRefusalPending(null);
+              if (mode === "bulk") setSelectedLeadIds([]);
+              void queryClient.invalidateQueries({ queryKey: ["leads"] });
+              void queryClient.invalidateQueries({ queryKey: ["leads-table"] });
+              void queryClient.invalidateQueries({ queryKey: ["leads-stage-counts"] });
+              void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+              void queryClient.invalidateQueries({ queryKey: ["analytics"] });
+              if (ok === leadIds.length) toast.success(mode === "bulk" ? `Отказ: ${ok}` : "Статус обновлен!");
+              else toast.error(`Отказ: ${ok}/${leadIds.length}. ${fail}`);
+            })();
           }}
         />
       ) : null}

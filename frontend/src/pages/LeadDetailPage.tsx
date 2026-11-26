@@ -22,6 +22,7 @@ import {
 import { PatientPhone } from "@/components/PatientPhone";
 import { BookingAttendancePanel } from "@/components/BookingAttendancePanel";
 import { ReferringDoctorField } from "@/components/ReferringDoctorField";
+import { RefusalReasonModal } from "@/components/RefusalReasonModal";
 import { WaitingCallbackModal } from "@/components/WaitingCallbackModal";
 import { auditActionLabel, auditDetailsLabel } from "@/lib/auditLabels";
 import { isRefusalStageName, leadStageChips } from "@/lib/leadStageChips";
@@ -127,6 +128,9 @@ export function LeadDetailPage() {
   const [moveDateYmd, setMoveDateYmd] = useState("");
   const [moveMinuteOfDay, setMoveMinuteOfDay] = useState<number | null>(null);
   const [waitingModalOpen, setWaitingModalOpen] = useState(false);
+  const [refusalModal, setRefusalModal] = useState<
+    null | { mode: "reject-button" } | { mode: "stage"; statusId: number; stageName: string }
+  >(null);
 
   const query = useQuery({
     queryKey: ["lead", leadId],
@@ -684,16 +688,7 @@ export function LeadDetailPage() {
                 <button
                   type="button"
                   disabled={rejectMutation.isPending}
-                  onClick={() => {
-                    const reason = window.prompt("Причина отказа");
-                    if (reason === null) return;
-                    if (!reason.trim()) {
-                      toast.error("Укажите причину отказа");
-                      return;
-                    }
-                    if (!window.confirm("Перевести лид в «Отказ»?")) return;
-                    rejectMutation.mutate(reason.trim());
-                  }}
+                  onClick={() => setRefusalModal({ mode: "reject-button" })}
                   className="rounded-xl border border-[var(--mo-danger)]/40 bg-[var(--mo-danger)]/10 px-3 py-3 text-sm font-semibold text-[var(--mo-danger)] transition hover:bg-[var(--mo-danger)]/15 disabled:opacity-50"
                 >
                   Отказ
@@ -723,20 +718,17 @@ export function LeadDetailPage() {
                           setWaitingModalOpen(true);
                           return;
                         }
-                        let refusalReason: string | undefined;
                         if (isRefusalStageName(s.name)) {
-                          const reason = window.prompt("Причина отказа");
-                          if (reason === null) return;
-                          if (!reason.trim()) {
-                            toast.error("Укажите причину отказа");
-                            return;
-                          }
-                          refusalReason = reason.trim();
+                          setRefusalModal({
+                            mode: "stage",
+                            statusId: s.id,
+                            stageName: s.name,
+                          });
+                          return;
                         }
                         setLeadStatusMutation.mutate({
                           statusId: s.id,
                           stageName: s.name,
-                          refusalReason,
                         });
                       }}
                       className={[
@@ -1321,6 +1313,36 @@ export function LeadDetailPage() {
             void qc.invalidateQueries({ queryKey: ["leads"] });
             void qc.invalidateQueries({ queryKey: ["tasks"] });
             void qc.invalidateQueries({ queryKey: ["chat-threads"] });
+          }}
+        />
+      ) : null}
+      {refusalModal != null ? (
+        <RefusalReasonModal
+          open
+          busy={
+            refusalModal.mode === "reject-button"
+              ? rejectMutation.isPending
+              : setLeadStatusMutation.isPending
+          }
+          onClose={() => {
+            if (rejectMutation.isPending || setLeadStatusMutation.isPending) return;
+            setRefusalModal(null);
+          }}
+          onConfirm={(reason) => {
+            if (refusalModal.mode === "reject-button") {
+              rejectMutation.mutate(reason, {
+                onSuccess: () => setRefusalModal(null),
+              });
+              return;
+            }
+            setLeadStatusMutation.mutate(
+              {
+                statusId: refusalModal.statusId,
+                stageName: refusalModal.stageName,
+                refusalReason: reason,
+              },
+              { onSuccess: () => setRefusalModal(null) },
+            );
           }}
         />
       ) : null}
