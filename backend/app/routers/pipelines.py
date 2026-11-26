@@ -28,9 +28,11 @@ router = APIRouter(prefix="/pipelines", tags=["pipelines"])
 
 
 def _pipeline_to_read(pipe: Pipeline) -> PipelineRead:
+    from app.services.ensure_crm_dn_pipeline_marketing_name import display_pipeline_name
+
     return PipelineRead(
         id=pipe.id,
-        name=pipe.name,
+        name=display_pipeline_name(pipe.name),
         type=pipe.type,
         lead_assignment_mode=pipe.lead_assignment_mode or "none",
         expert_user_id=pipe.expert_user_id,

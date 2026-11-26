@@ -26,6 +26,7 @@ import { decodeRoleFromToken } from "@/lib/auth";
 import { CRM_DN_DEFAULT_SPECIALTY, CRM_DN_SPECIALTY_SUGGESTIONS } from "@/lib/crmDnSpecialties";
 import { EXPENSE_CATALOG } from "@/lib/expenseCatalog";
 import { APP_CURRENCY } from "@/lib/money";
+import { pipelineDisplayName } from "@/lib/pipelineDisplayName";
 import { DateField } from "@/components/DateField";
 import { Printer } from "@/components/icons";
 import { MonthYearPicker } from "@/components/MonthYearPicker";
@@ -1239,7 +1240,7 @@ export function ExpensesPage() {
               </button>
               <span className="expenses-month__total tabular-nums">
                 {payrollQuery.data?.pipeline_name
-                  ? `Бонус из KPI · ${payrollQuery.data.pipeline_name}`
+                  ? `Бонус из KPI · ${pipelineDisplayName(payrollQuery.data.pipeline_name)}`
                   : "Бонус из KPI"}
               </span>
             </div>

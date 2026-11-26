@@ -283,6 +283,15 @@ export function EmployeesPage() {
   const pipelines = pipelinesQuery.data ?? [];
   const pipelineById = useMemo(() => new Map(pipelines.map((p) => [p.id, p])), [pipelines]);
 
+  // Приглашение менеджера: sales-воронки отмечены сразу (бэкенд тоже подставит, если пусто).
+  useEffect(() => {
+    if (!open) return;
+    if (role !== "manager" && role !== "rop" && role !== "admin" && role !== "administrator") return;
+    if (pipelineIds.length > 0 || pipelines.length === 0) return;
+    const salesIds = pipelines.filter((p) => (p.type || "sales") === "sales").map((p) => p.id);
+    setPipelineIds(salesIds.length ? salesIds : pipelines.map((p) => p.id));
+  }, [open, role, pipelines, pipelineIds.length]);
+
   const myUserId = useMemo(() => decodeUserIdFromToken(getStoredToken()), []);
 
   const activeSalesManagers = useMemo(

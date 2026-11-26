@@ -2353,7 +2353,7 @@ export function CrmPage() {
                       onClick={() => {
                         if (
                           !window.confirm(
-                            `Удалить пустую воронку «${selectedPipelineForSettings.name}»? Если есть лиды — используйте «Закрыть воронку».`,
+                            `Удалить пустую воронку «${pipelineDisplayName(selectedPipelineForSettings.name)}»? Если есть лиды — используйте «Закрыть воронку».`,
                           )
                         )
                           return;
@@ -2376,7 +2376,7 @@ export function CrmPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="lux-subheading">Закрыть воронку</h2>
-                <p className="mt-1 text-sm mo-muted">«{selectedPipelineForSettings.name}»</p>
+                <p className="mt-1 text-sm mo-muted">«{pipelineDisplayName(selectedPipelineForSettings.name)}»</p>
               </div>
               <button
                 type="button"

@@ -737,13 +737,23 @@ async def invite_employee(
 ) -> InviteEmployeeResult:
     await assert_owner_or_chief_expert(db, current_user)
 
-    if body.role == UserRole.admin and not body.pipeline_ids:
+    # Менеджер/РОП/админ без галочек → sales-воронки автоматически (KPI и лиды без ручного тыка).
+    pipeline_ids = list(body.pipeline_ids or [])
+    if not pipeline_ids and body.role in (
+        UserRole.manager,
+        UserRole.rop,
+        UserRole.admin,
+        UserRole.administrator,
+    ):
+        pipeline_ids = await _default_sales_pipeline_ids(db, company_id)
+
+    if body.role == UserRole.admin and not pipeline_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Для роли «Админ» укажите хотя бы одну воронку (онлайн-запись и лиды по направлению)",
+            detail="Для роли «Админ» нужна воронка (онлайн-запись и лиды). Создайте sales-воронку или укажите вручную.",
         )
     if body.role == UserRole.expert:
-        if not body.pipeline_ids:
+        if not pipeline_ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Для эксперта укажите хотя бы одну воронку CRM",
@@ -754,6 +764,11 @@ async def invite_employee(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Укажите специальность эксперта (под ФИО в календаре записи, например Консультант)",
             )
+    if body.role in (UserRole.manager, UserRole.rop, UserRole.administrator) and not pipeline_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Нет воронки sales в компании — создайте воронку или укажите вручную",
+        )
 
     email = body.email.strip().lower()
     if "@" not in email or "." not in email.split("@")[-1]:
@@ -766,12 +781,12 @@ async def invite_employee(
         )
 
     # validate pipelines
-    if body.pipeline_ids:
+    if pipeline_ids:
         r = await db.execute(
-            select(Pipeline.id).where(Pipeline.company_id == company_id, Pipeline.id.in_(body.pipeline_ids))
+            select(Pipeline.id).where(Pipeline.company_id == company_id, Pipeline.id.in_(pipeline_ids))
         )
         ok = {x[0] for x in r.all()}
-        if set(body.pipeline_ids) != ok:
+        if set(pipeline_ids) != ok:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown pipeline_id in list")
 
     _invite_app_base(request)
@@ -862,7 +877,7 @@ async def invite_employee(
             UserPipelineAssignment.company_id == company_id,
         )
     )
-    for pid in body.pipeline_ids:
+    for pid in pipeline_ids:
         db.add(UserPipelineAssignment(company_id=company_id, user_id=u.id, pipeline_id=pid))
 
     await db.flush()
@@ -950,6 +965,26 @@ async def invite_employee(
         temp_password=temp_password,
         detail=detail,
     )
+
+
+async def _default_sales_pipeline_ids(db: AsyncSession, company_id: int) -> list[int]:
+    """Sales-воронки компании (CRM-DN: «Маркетинг»). Если type пуст — все воронки компании."""
+    sales = (
+        await db.execute(
+            select(Pipeline.id)
+            .where(Pipeline.company_id == company_id, Pipeline.type == "sales")
+            .order_by(Pipeline.id.asc()),
+        )
+    ).scalars().all()
+    ids = [int(x) for x in sales]
+    if ids:
+        return ids
+    any_pipes = (
+        await db.execute(
+            select(Pipeline.id).where(Pipeline.company_id == company_id).order_by(Pipeline.id.asc()),
+        )
+    ).scalars().all()
+    return [int(x) for x in any_pipes]
 
 
 async def _validate_pipeline_ids(db: AsyncSession, company_id: int, pipeline_ids: list[int]) -> list[int]:

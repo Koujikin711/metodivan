@@ -123,11 +123,13 @@ async def list_kpi_pipelines(
             & (UserPipelineAssignment.user_id == current_user.id)
             & (UserPipelineAssignment.company_id == company_id),
         )
+    from app.services.ensure_crm_dn_pipeline_marketing_name import display_pipeline_name
+
     rows = (await db.execute(q)).all()
     return [
         SalesKpiPipelineMeta(
             id=int(p.id),
-            name=p.name,
+            name=display_pipeline_name(p.name),
             expert_user_id=p.expert_user_id,
             expert_name=(full_name or email) if (full_name or email) else None,
         )

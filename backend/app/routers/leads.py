@@ -1308,6 +1308,17 @@ class LeadRedistributeEqualBody(BaseModel):
     )
 
 
+class LeadAssignSilentBody(BaseModel):
+    """Отдать все «молчаливые» лиды (Новый лид, без исходящих менеджера) одному менеджеру."""
+
+    to_manager_id: int = Field(..., ge=1)
+    include_unassigned: bool = Field(default=True, description="Включая лиды без менеджера")
+    from_manager_ids: list[int] | None = Field(
+        default=None,
+        description="Откуда забирать; пусто = все активные менеджеры компании",
+    )
+
+
 class LeadRedistributeResult(BaseModel):
     total: int
     reassigned: int
@@ -1763,6 +1774,106 @@ async def redistribute_leads_equal_among_managers(
         reassigned=changed + restored_n,
         per_manager=final_counts,
     )
+
+
+@router.post("/assign-silent", response_model=LeadRedistributeResult)
+async def assign_silent_leads_to_manager(
+    body: LeadAssignSilentBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: CurrentUser,
+    company_id: CurrentCompanyId,
+) -> LeadRedistributeResult:
+    """Передать молчаливые лиды (с кем не общались) одному менеджеру. Проданные/с перепиской не трогаем."""
+    if not _is_lead_redistribution_admin(current_user.role):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Только владелец или админ воронки")
+
+    from app.services.lead_assignment import list_company_manager_ids
+    from app.services.lead_equal_redistribute import selectable_silent_leads
+
+    to_id = int(body.to_manager_id)
+    await _load_redistribution_target(db, manager_id=to_id, company_id=company_id)
+
+    if body.from_manager_ids:
+        source_ids = sorted({int(x) for x in body.from_manager_ids})
+        for sid in source_ids:
+            await _load_redistribution_target(db, manager_id=sid, company_id=company_id)
+    else:
+        source_ids = await list_company_manager_ids(db, company_id=company_id)
+        if to_id not in source_ids:
+            source_ids = sorted({*source_ids, to_id})
+    if not source_ids:
+        raise HTTPException(status_code=400, detail="Нет менеджеров-источников")
+
+    lead_rows = await selectable_silent_leads(
+        db,
+        company_id=company_id,
+        target_ids=source_ids,
+        include_unassigned=body.include_unassigned,
+    )
+    if not lead_rows:
+        return LeadRedistributeResult(total=0, reassigned=0, per_manager={to_id: 0})
+
+    batch = await write_audit_event(
+        db,
+        entity_type="lead",
+        entity_id=0,
+        action="leads_assigned_silent",
+        current_user=current_user,
+        details=f"to={to_id}, sources={source_ids}, total={len(lead_rows)}",
+    )
+    batch_id = int(batch.id)
+    changed = 0
+    for lead_id, from_mid in lead_rows:
+        old_mid = int(from_mid) if from_mid is not None else None
+        if old_mid == to_id:
+            continue
+        lead = await db.get(Lead, int(lead_id))
+        if lead is None:
+            continue
+        if old_mid is not None:
+            await _freeze_booking_sellers_on_lead_reassign(
+                db,
+                company_id=company_id,
+                lead_id=int(lead_id),
+                from_manager_id=old_mid,
+            )
+        lead.manager_id = to_id
+        changed += 1
+        await _audit_lead(
+            db,
+            lead_id=int(lead_id),
+            action="manager_reassigned",
+            current_user=current_user,
+            details=(
+                f"from_manager_id={old_mid}, to_manager_id={to_id} "
+                f"(assign-silent), batch_id={batch_id}"
+            ),
+        )
+        if old_mid is not None:
+            await db.execute(
+                update(Task)
+                .where(
+                    Task.company_id == company_id,
+                    Task.related_lead_id == int(lead_id),
+                    Task.assigned_to == old_mid,
+                    Task.status.in_([TaskStatus.pending, TaskStatus.in_progress]),
+                )
+                .values(assigned_to=to_id),
+            )
+
+    await db.flush()
+    await db.commit()
+
+    if changed:
+        await _notify_users(
+            db,
+            company_id=company_id,
+            user_ids=[to_id],
+            title="Вам передали молчаливые лиды",
+            description=f"Передано лидов без переписки: {changed}. Проданные и с перепиской не трогали.",
+        )
+
+    return LeadRedistributeResult(total=len(lead_rows), reassigned=changed, per_manager={to_id: changed})
 
 
 @router.post("/redistribute-from-owners", response_model=LeadRedistributeResult)

@@ -11,12 +11,18 @@ from app.models import Pipeline
 
 logger = logging.getLogger(__name__)
 
-# Только английское legacy-имя с прода; «Основная» не трогаем в БД —
-# в UI всё равно показывается как «Маркетинг».
+# Legacy-имена → «Маркетинг» в БД и в API dropdown.
 _LEGACY_NAMES = {
     "sales funnel",
     "sales_funnel",
     "salesfunnel",
+    "sales",
+    "pipeline",
+    "sales pipeline",
+    "основная",
+    "основной",
+    "main",
+    "default",
 }
 
 TARGET = "Маркетинг"
@@ -28,13 +34,22 @@ def _norm(name: str | None) -> str:
 
 def _should_rename(name: str | None) -> bool:
     key = _norm(name)
-    if key in _LEGACY_NAMES or key == _norm(TARGET):
-        return key != _norm(TARGET) and key in _LEGACY_NAMES
+    if key == _norm(TARGET):
+        return False
+    if key in _LEGACY_NAMES:
+        return True
     if "funnel" in key and "sales" in key:
         return True
-    if key in {"sales", "pipeline", "sales pipeline"}:
+    if key.isascii() and ("funnel" in key or "pipeline" in key):
         return True
     return False
+
+
+def display_pipeline_name(name: str | None) -> str:
+    """Имя для API/ответов: legacy или пусто → Маркетинг."""
+    if _should_rename(name) or not (name or "").strip():
+        return TARGET
+    return str(name).strip()
 
 
 async def ensure_crm_dn_pipeline_marketing_name() -> int:
