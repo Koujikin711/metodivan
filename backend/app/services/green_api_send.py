@@ -130,8 +130,8 @@ def send_green_text(config: dict | None, chat_id: str, text: str) -> tuple[bool,
     body = json.dumps({"chatId": chat_id, "message": text}).encode("utf-8")
     req = urlrequest.Request(url, data=body, method="POST", headers={"Content-Type": "application/json"})
     try:
-        # Успех обычно 1–3с; 12с — потолок, дальше fail-fast + QR (если ready).
-        with urlrequest.urlopen(req, timeout=12) as resp:
+        # Автоответы/тики — без UI; 20с снижает ложные «Не отправлено» при медленном Green.
+        with urlrequest.urlopen(req, timeout=20) as resp:
             raw = resp.read().decode("utf-8") if resp else ""
             data = json.loads(raw) if raw else {}
             ok, err, mid = _green_success_or_error(data, raw)

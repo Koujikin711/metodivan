@@ -189,6 +189,7 @@ async def send_welcome_if_first_incoming(
     thread: ChatThread,
     integration: Integration,
 ) -> None:
+    # Успешная отправка блокирует повтор. Ошибка (failed) — можно попробовать снова на следующем входе.
     if await _has_event(db, entity_type="lead", entity_id=lead.id, action="whatsapp_welcome_sent"):
         return
     cfg = integration.config if isinstance(integration.config, dict) else {}
@@ -219,8 +220,9 @@ async def send_welcome_if_first_incoming(
         db,
         entity_type="lead",
         entity_id=lead.id,
-        action="whatsapp_welcome_sent",
+        action="whatsapp_welcome_sent" if ok else "whatsapp_welcome_failed",
         current_user=None,
+        company_id=getattr(lead, "company_id", None) or getattr(thread, "company_id", None),
         details=None if ok else f"send_failed={err}",
     )
 

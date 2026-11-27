@@ -797,11 +797,53 @@ async def lifespan(_: FastAPI):
         while not stop_event.is_set():
             try:
                 async with AsyncSessionLocal() as session:
-                    sent = await run_whatsapp_reminder_tick(session)
-                    waiting_sent = await run_waiting_callback_tick(session)
-                    archive_evening = await run_archive_evening_reactivate_tick(session)
-                    lead_base_emails = await run_lead_base_email_tick(session)
-                    await session.commit()
+                    sent = 0
+                    waiting_sent = 0
+                    archive_evening = 0
+                    lead_base_emails = 0
+                    try:
+                        sent = await run_whatsapp_reminder_tick(session)
+                        await session.commit()
+                    except Exception as wa_exc:
+                        logger.warning("whatsapp reminder tick skipped: %s", wa_exc)
+                        record_background_event(
+                            source="whatsapp_reminders",
+                            ok=False,
+                            message=str(wa_exc)[:400],
+                        )
+                        try:
+                            await session.rollback()
+                        except Exception:
+                            pass
+                    try:
+                        waiting_sent = await run_waiting_callback_tick(session)
+                        await session.commit()
+                    except Exception as wait_exc:
+                        logger.warning("waiting callback tick skipped: %s", wait_exc)
+                        record_background_event(
+                            source="waiting_callbacks",
+                            ok=False,
+                            message=str(wait_exc)[:400],
+                        )
+                        try:
+                            await session.rollback()
+                        except Exception:
+                            pass
+                    try:
+                        archive_evening = await run_archive_evening_reactivate_tick(session)
+                        lead_base_emails = await run_lead_base_email_tick(session)
+                        await session.commit()
+                    except Exception as archive_exc:
+                        logger.warning("archive/lead-base tick skipped: %s", archive_exc)
+                        record_background_event(
+                            source="archive_evening_reactivate",
+                            ok=False,
+                            message=str(archive_exc)[:400],
+                        )
+                        try:
+                            await session.rollback()
+                        except Exception:
+                            pass
                     if sent:
                         logger.info("whatsapp reminders sent: %s", sent)
                     if sent:

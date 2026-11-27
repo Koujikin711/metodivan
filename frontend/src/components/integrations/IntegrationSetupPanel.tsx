@@ -180,7 +180,9 @@ function GreenApiWebhookPanel({ integrationId }: { integrationId: number }) {
       {!st?.public_api_base_url ? (
         <p className="leading-relaxed text-[var(--mo-warning)]">
           На Amvera задайте переменную <span className="font-mono">PUBLIC_API_BASE_URL</span> ={" "}
-          <span className="font-mono">https://metodi-one-koujikin.mia0.amvera.tech</span>
+          <span className="font-mono">
+            {typeof window !== "undefined" ? window.location.origin : "https://…ваш-домен-crm…"}
+          </span>
         </p>
       ) : null}
       <button

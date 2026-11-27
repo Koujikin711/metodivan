@@ -25,8 +25,18 @@ from app.services.green_api_send import send_green_text
 _BOOKING_TZ = ZoneInfo("Asia/Dushanbe")
 
 
+def _as_utc(dt: datetime | None) -> datetime | None:
+    """SQLite/драйвер иногда отдаёт scheduled_at без tz → иначе падает вычитание с now(UTC)."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
+
+
 def _fmt_dt(dt: datetime) -> tuple[str, str]:
-    local = dt.astimezone(_BOOKING_TZ) if dt.tzinfo else dt.replace(tzinfo=UTC).astimezone(_BOOKING_TZ)
+    aware = _as_utc(dt) or dt
+    local = aware.astimezone(_BOOKING_TZ)
     return local.strftime("%d.%m.%Y"), local.strftime("%H:%M")
 
 
@@ -55,9 +65,10 @@ async def run_waiting_callback_tick(db: AsyncSession) -> int:
         if row.manager_id is None:
             row.manager_notified_at = now
             continue
-        date_s, time_s = _fmt_dt(row.scheduled_at)
+        scheduled = _as_utc(row.scheduled_at) or now
+        date_s, time_s = _fmt_dt(scheduled)
         pain = (row.pain_text or "").strip() or "—"
-        hours_left = (row.scheduled_at - now).total_seconds() / 3600.0
+        hours_left = (scheduled - now).total_seconds() / 3600.0
         when_line = (
             f"Сегодня ({date_s} в {time_s})"
             if hours_left < 20
@@ -66,7 +77,7 @@ async def run_waiting_callback_tick(db: AsyncSession) -> int:
         task = Task(
             company_id=row.company_id,
             title=f"Связаться с клиентом: {row.client_name}",
-            deadline=as_clinic_naive(row.scheduled_at),
+            deadline=as_clinic_naive(scheduled),
             status=TaskStatus.pending,
             assigned_to=row.manager_id,
             created_by_user_id=None,
@@ -95,6 +106,7 @@ async def run_waiting_callback_tick(db: AsyncSession) -> int:
             entity_id=row.id,
             action="waiting_manager_notified",
             current_user=None,
+            company_id=row.company_id,
             details=f"lead_id={row.lead_id}, manager_id={row.manager_id}",
         )
         acted += 1
@@ -130,6 +142,7 @@ async def run_waiting_callback_tick(db: AsyncSession) -> int:
                 entity_id=row.id,
                 action="waiting_client_reminder_skipped",
                 current_user=None,
+                company_id=row.company_id,
                 details="no_green_api_integration",
             )
             acted += 1
@@ -173,6 +186,7 @@ async def run_waiting_callback_tick(db: AsyncSession) -> int:
             entity_id=row.id,
             action="waiting_client_reminder_sent" if ok else "waiting_client_reminder_failed",
             current_user=None,
+            company_id=row.company_id,
             details=None if ok else f"send_failed={err}",
         )
         acted += 1
