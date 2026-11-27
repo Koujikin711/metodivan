@@ -127,7 +127,7 @@ from app.services.runtime_metrics import runtime_metrics
 from app.services.waiting_callback_reminders import run_waiting_callback_tick
 from app.services.archive_evening_reactivate import run_archive_evening_reactivate_tick
 from app.services.lead_base_email import run_lead_base_email_tick
-from app.services.whatsapp_automation import run_whatsapp_reminder_tick
+from app.services.whatsapp_automation import run_welcome_retry_tick, run_whatsapp_reminder_tick
 
 logger = logging.getLogger(__name__)
 
@@ -803,7 +803,15 @@ async def lifespan(_: FastAPI):
                     lead_base_emails = 0
                     try:
                         sent = await run_whatsapp_reminder_tick(session)
+                        welcome_retried = await run_welcome_retry_tick(session)
                         await session.commit()
+                        if welcome_retried:
+                            logger.info("whatsapp welcome retries: %s", welcome_retried)
+                            record_background_event(
+                                source="whatsapp_welcome_retry",
+                                ok=True,
+                                message=f"Повтор автоприветствий: {welcome_retried}",
+                            )
                     except Exception as wa_exc:
                         logger.warning("whatsapp reminder tick skipped: %s", wa_exc)
                         record_background_event(

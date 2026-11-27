@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import time
 from typing import Any
 from urllib import error as urlerror
 from urllib import request as urlrequest
@@ -14,6 +16,12 @@ from app.config import settings
 from app.services.green_api_settings import green_api_base_from_config, green_media_base_from_config
 
 logger = logging.getLogger(__name__)
+
+# Green на Amvera иногда «задумывается» 15–30с; один таймаут ≠ «нельзя отправить».
+_SEND_ATTEMPTS = 3
+_SEND_TIMEOUT_SYNC = 18.0
+_SEND_TIMEOUT_ASYNC = 18.0
+_SEND_BACKOFF_SEC = (1.5, 3.0)
 
 
 def _qr_bridge_ready() -> tuple[bool, str]:
@@ -119,7 +127,56 @@ def _via_qr_text(chat_id: str, text: str, green_error: str) -> tuple[bool, str |
     return False, _combine_send_errors(err, green_error), None
 
 
-def send_green_text(config: dict | None, chat_id: str, text: str) -> tuple[bool, str | None, str | None]:
+def _is_transient_green_error(detail: str | None) -> bool:
+    d = (detail or "").lower()
+    if not d:
+        return False
+    keys = (
+        "timed out",
+        "timeout",
+        "temporarily",
+        "connection reset",
+        "connection aborted",
+        "broken pipe",
+        "network is unreachable",
+        "name or service not known",
+        "503",
+        "502",
+        "504",
+        "429",
+    )
+    return any(k in d for k in keys)
+
+
+def _send_green_text_once(
+    *,
+    url: str,
+    chat_id: str,
+    text: str,
+    timeout: float,
+) -> tuple[bool, str | None, str | None]:
+    """Одна попытка sendMessage. ok / (False, err, None)."""
+    body = json.dumps({"chatId": chat_id, "message": text}).encode("utf-8")
+    req = urlrequest.Request(url, data=body, method="POST", headers={"Content-Type": "application/json"})
+    try:
+        with urlrequest.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8") if resp else ""
+            data = json.loads(raw) if raw else {}
+            return _green_success_or_error(data, raw)
+    except urlerror.HTTPError as e:
+        chunk = e.read().decode("utf-8", errors="replace")[:400]
+        return False, _green_http_error_detail(e.code, chunk), None
+    except Exception as e:
+        return False, _exc_detail(e), None
+
+
+def send_green_text(
+    config: dict | None,
+    chat_id: str,
+    text: str,
+    *,
+    attempts: int | None = None,
+) -> tuple[bool, str | None, str | None]:
     cfg = config or {}
     instance_id = cfg.get("instance_id") or cfg.get("instanceId")
     api_token = cfg.get("api_token") or cfg.get("apiToken") or cfg.get("apiTokenInstance")
@@ -127,25 +184,41 @@ def send_green_text(config: dict | None, chat_id: str, text: str) -> tuple[bool,
         return _via_qr_text(chat_id, text, "Нет instance_id/api_token в интеграции")
     base = green_api_base_from_config(cfg)
     url = f"{base}/waInstance{instance_id}/sendMessage/{api_token}"
-    body = json.dumps({"chatId": chat_id, "message": text}).encode("utf-8")
-    req = urlrequest.Request(url, data=body, method="POST", headers={"Content-Type": "application/json"})
-    try:
-        # Автоответы/тики — без UI; 20с снижает ложные «Не отправлено» при медленном Green.
-        with urlrequest.urlopen(req, timeout=20) as resp:
-            raw = resp.read().decode("utf-8") if resp else ""
-            data = json.loads(raw) if raw else {}
-            ok, err, mid = _green_success_or_error(data, raw)
-            if ok:
-                return True, None, mid
-            return _via_qr_text(chat_id, text, err or "GREEN API: нет idMessage")
-    except urlerror.HTTPError as e:
-        chunk = e.read().decode("utf-8", errors="replace")[:400]
-        return _via_qr_text(chat_id, text, _green_http_error_detail(e.code, chunk))
-    except Exception as e:
-        return _via_qr_text(chat_id, text, _exc_detail(e))
+    max_attempts = max(1, int(attempts if attempts is not None else _SEND_ATTEMPTS))
+    last_err: str | None = None
+    for attempt in range(max_attempts):
+        ok, err, mid = _send_green_text_once(
+            url=url,
+            chat_id=chat_id,
+            text=text,
+            timeout=_SEND_TIMEOUT_SYNC,
+        )
+        if ok:
+            if attempt:
+                logger.info("sendMessage ok after retry chat=%s attempt=%s", chat_id, attempt + 1)
+            return True, None, mid
+        last_err = err
+        if attempt + 1 >= max_attempts or not _is_transient_green_error(err):
+            break
+        delay = _SEND_BACKOFF_SEC[min(attempt, len(_SEND_BACKOFF_SEC) - 1)]
+        logger.warning(
+            "sendMessage retry chat=%s attempt=%s wait=%.1fs detail=%s",
+            chat_id,
+            attempt + 1,
+            delay,
+            (err or "")[:180],
+        )
+        time.sleep(delay)
+    return _via_qr_text(chat_id, text, last_err or "GREEN API: не удалось отправить")
 
 
-async def send_green_text_async(config: dict | None, chat_id: str, text: str) -> tuple[bool, str | None, str | None]:
+async def send_green_text_async(
+    config: dict | None,
+    chat_id: str,
+    text: str,
+    *,
+    attempts: int | None = None,
+) -> tuple[bool, str | None, str | None]:
     cfg = config or {}
     instance_id = cfg.get("instance_id") or cfg.get("instanceId")
     api_token = cfg.get("api_token") or cfg.get("apiToken") or cfg.get("apiTokenInstance")
@@ -154,21 +227,41 @@ async def send_green_text_async(config: dict | None, chat_id: str, text: str) ->
     base = green_api_base_from_config(cfg)
     url = f"{base}/waInstance{instance_id}/sendMessage/{api_token}"
     body: dict[str, Any] = {"chatId": chat_id, "message": text}
-    try:
-        # Не 25–40с: иначе UI «висит». Успех ~2с; при таймауте сразу явная ошибка.
-        async with httpx.AsyncClient(timeout=httpx.Timeout(12.0, connect=5.0)) as client:
-            r = await client.post(url, json=body)
-            if r.status_code >= 400:
-                return _via_qr_text(chat_id, text, _green_http_error_detail(r.status_code, r.text))
-            data = r.json() if r.text else {}
-            ok, err, mid = _green_success_or_error(data, r.text or "")
-            if ok:
-                return True, None, mid
-            return _via_qr_text(chat_id, text, err or "GREEN API: нет idMessage")
-    except Exception as e:
-        detail = _exc_detail(e)
-        logger.warning("sendMessage failed chat=%s detail=%s", chat_id, detail)
-        return _via_qr_text(chat_id, text, detail)
+    max_attempts = max(1, int(attempts if attempts is not None else _SEND_ATTEMPTS))
+    last_err: str | None = None
+    for attempt in range(max_attempts):
+        try:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(_SEND_TIMEOUT_ASYNC, connect=6.0)
+            ) as client:
+                r = await client.post(url, json=body)
+                if r.status_code >= 400:
+                    last_err = _green_http_error_detail(r.status_code, r.text)
+                else:
+                    data = r.json() if r.text else {}
+                    ok, err, mid = _green_success_or_error(data, r.text or "")
+                    if ok:
+                        if attempt:
+                            logger.info(
+                                "sendMessage async ok after retry chat=%s attempt=%s",
+                                chat_id,
+                                attempt + 1,
+                            )
+                        return True, None, mid
+                    last_err = err
+        except Exception as e:
+            last_err = _exc_detail(e)
+            logger.warning(
+                "sendMessage async failed chat=%s attempt=%s detail=%s",
+                chat_id,
+                attempt + 1,
+                last_err,
+            )
+        if attempt + 1 >= max_attempts or not _is_transient_green_error(last_err):
+            break
+        delay = _SEND_BACKOFF_SEC[min(attempt, len(_SEND_BACKOFF_SEC) - 1)]
+        await asyncio.sleep(delay)
+    return _via_qr_text(chat_id, text, last_err or "GREEN API: не удалось отправить")
 
 
 def _location_text(latitude: float, longitude: float, name_location: str, address: str) -> str:

@@ -105,6 +105,27 @@ async def _thread_for_lead_green(db: AsyncSession, lead: Lead) -> ChatThread | N
     return (await db.execute(q)).scalars().first()
 
 
+async def _find_failed_outgoing(
+    db: AsyncSession,
+    *,
+    thread_id: int,
+    text: str,
+) -> ChatMessage | None:
+    """Последнее исходящее с тем же текстом и статусом failed — чтобы не плодить «Не отправлено»."""
+    q = (
+        select(ChatMessage)
+        .where(
+            ChatMessage.thread_id == thread_id,
+            ChatMessage.direction == "out",
+            ChatMessage.delivery_status.in_(("failed", "error")),
+            ChatMessage.text == (text or " "),
+        )
+        .order_by(ChatMessage.id.desc())
+        .limit(1)
+    )
+    return (await db.execute(q)).scalars().first()
+
+
 async def _log_outgoing_message(
     db: AsyncSession,
     *,
@@ -112,21 +133,31 @@ async def _log_outgoing_message(
     text: str,
     delivery_status: str,
     provider_message_id: str | None,
-) -> None:
-    db.add(
-        ChatMessage(
-            thread_id=thread.id,
-            author_user_id=None,
-            direction="out",
-            text=text or " ",
-            message_type="text",
-            delivery_status=delivery_status,
-            provider_message_id=provider_message_id,
-            created_at=datetime.now(UTC),
-        )
+    reuse_failed: bool = False,
+) -> ChatMessage:
+    if reuse_failed:
+        existing = await _find_failed_outgoing(db, thread_id=thread.id, text=text or " ")
+        if existing is not None:
+            existing.delivery_status = delivery_status
+            existing.provider_message_id = provider_message_id
+            if delivery_status == "sent":
+                touch_thread_on_message(thread, "out")
+            await db.flush()
+            return existing
+    msg = ChatMessage(
+        thread_id=thread.id,
+        author_user_id=None,
+        direction="out",
+        text=text or " ",
+        message_type="text",
+        delivery_status=delivery_status,
+        provider_message_id=provider_message_id,
+        created_at=datetime.now(UTC),
     )
+    db.add(msg)
     touch_thread_on_message(thread, "out")
     await db.flush()
+    return msg
 
 
 def booking_message_manager_name(responsible_name: str | None, lead_manager_name: str | None) -> str | None:
@@ -215,6 +246,7 @@ async def send_welcome_if_first_incoming(
         text=text,
         delivery_status=("sent" if ok else "failed"),
         provider_message_id=provider_id,
+        reuse_failed=True,
     )
     await write_audit_event(
         db,
@@ -225,6 +257,81 @@ async def send_welcome_if_first_incoming(
         company_id=getattr(lead, "company_id", None) or getattr(thread, "company_id", None),
         details=None if ok else f"send_failed={err}",
     )
+
+
+async def run_welcome_retry_tick(db: AsyncSession, *, limit: int = 5) -> int:
+    """Повтор автоприветствий, упавших по таймауту Green (пока QR offline)."""
+    since = datetime.now(UTC) - timedelta(hours=6)
+    failed_rows = (
+        await db.execute(
+            select(SystemAuditEvent)
+            .where(
+                SystemAuditEvent.action == "whatsapp_welcome_failed",
+                SystemAuditEvent.entity_type == "lead",
+                SystemAuditEvent.entity_id.is_not(None),
+                SystemAuditEvent.created_at >= since,
+            )
+            .order_by(SystemAuditEvent.id.desc())
+            .limit(80)
+        )
+    ).scalars().all()
+    seen_leads: set[int] = set()
+    retried = 0
+    for ev in failed_rows:
+        lead_id = int(ev.entity_id) if ev.entity_id is not None else 0
+        if not lead_id or lead_id in seen_leads:
+            continue
+        seen_leads.add(lead_id)
+        if await _has_event(db, entity_type="lead", entity_id=lead_id, action="whatsapp_welcome_sent"):
+            continue
+        lead = await db.get(Lead, lead_id)
+        if lead is None:
+            continue
+        await db.refresh(lead, ["stage"])
+        pipeline_id = lead.stage.pipeline_id if lead.stage else None
+        integ = await _active_green_integration_for_pipeline(db, pipeline_id)
+        if integ is None:
+            continue
+        thread = await _thread_for_lead_green(db, lead)
+        if thread is None:
+            continue
+        cfg = integ.config if isinstance(integ.config, dict) else {}
+        tpl = _templates_from_integration_config(cfg).get("greeting", _DEFAULT_TEMPLATES["greeting"])
+        text = _render_template(
+            tpl,
+            {
+                "name": (lead.name or "Клиент").strip() or "Клиент",
+                "date": "",
+                "time": "",
+                "manager": "",
+            },
+        ).strip()
+        chat_id = _chat_id_from_thread_or_phone(thread, lead.phone)
+        if not text or not chat_id:
+            continue
+        # В тике короче: 2 попытки, чтобы не блокировать весь background на минуты.
+        ok, err, provider_id = send_green_text(cfg, chat_id, text, attempts=2)
+        await _log_outgoing_message(
+            db,
+            thread=thread,
+            text=text,
+            delivery_status=("sent" if ok else "failed"),
+            provider_message_id=provider_id,
+            reuse_failed=True,
+        )
+        await write_audit_event(
+            db,
+            entity_type="lead",
+            entity_id=lead.id,
+            action="whatsapp_welcome_sent" if ok else "whatsapp_welcome_failed",
+            current_user=None,
+            company_id=getattr(lead, "company_id", None) or getattr(thread, "company_id", None),
+            details=None if ok else f"retry_send_failed={err}",
+        )
+        retried += 1
+        if retried >= limit:
+            break
+    return retried
 
 
 async def booking_whatsapp_confirmation_sent(db: AsyncSession, appointment_id: int) -> bool:
